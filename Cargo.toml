@@ -1,0 +1,15 @@
+[package]
+name = "softland"
+version = "0.1.0"
+authors = ["Benjamin Adamson <adamson.benjamin@gmail.com>"]
+
+[dependencies]
+imgui = { version = "0.0.14" }
+
+gfx = "0.16"
+gfx_window_glutin = "0.16"
+glium = { version = "0.16", default-features = true }
+glutin = "0.8"
+
+imgui-gfx-renderer = "0.0.14"
+imgui-glium-renderer = "0.0.14"
