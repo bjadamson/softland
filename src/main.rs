@@ -4,7 +4,7 @@ extern crate imgui;
 extern crate imgui_glium_renderer;
 
 use imgui::*;
-use chat_history::{ChatWindowConfig, ChatHistory, ChatMessage};
+use chat_history::{Channel, ChatWindowConfig, ChatHistory, ChatMessage};
 
 use self::support::Support;
 
@@ -25,7 +25,8 @@ struct GameConfig {
 
 struct State {
     chat_input_buffer: ImString,
-    chat_history: ChatHistory
+    chat_history: ChatHistory,
+    chat_button_pressed: Channel
 }
 
 fn main() {
@@ -42,7 +43,9 @@ fn main() {
         window_dimensions: (1024, 768),
         chat_window_config: chat_config
         };
-    let state = State { chat_input_buffer: ImString::with_capacity(capacity), chat_history: ChatHistory::new()};
+    let state = State { chat_input_buffer: ImString::with_capacity(capacity), chat_history: ChatHistory::new(),
+        chat_button_pressed: Channel::new(0)
+        };
     let mut game = Game { config: config, state: state };
     let mut support = Support::init(game.config.window_dimensions);
 
@@ -64,25 +67,29 @@ fn print_chat_msg<'a>(ui: &Ui<'a>, msg: &ChatMessage) {
     }
 }
 
-fn print_chat_messages<'a>(ui: &Ui<'a>, history: &ChatHistory) {
-    for msg in history.iter() {
+fn print_chat_messages<'a>(channel: Channel, ui: &Ui<'a>, history: &ChatHistory) {
+    // If looking at channel 0, show all results.
+    // Otherwise only yield results for the channel.
+    for msg in history.iter().filter(|&msg| { channel == Channel::new(0) || msg.channel == channel }) {
         print_chat_msg(&ui, &msg);
     }
     ui.text_colored((0.0, 0.77, 0.46, 1.0), im_str!("Admin: Let there be color!"));
 }
 
-fn add_chat_button<'a>(text: &ImStr, ui: &Ui<'a>) {
+fn add_chat_button<'a>(text: &ImStr, ui: &Ui<'a>) -> bool {
     let dont_wrap = -1.0;
     let text_size = ui.calc_text_size(text, false, dont_wrap);
 
     let button_padding = ImVec2::new(10.0, 7.0);
-    ui.button(text, text_size + button_padding);
+    let pressed = ui.button(text, text_size + button_padding);
 
     // setting the POS_X to 0.0 tells imgui to place the next item immediately after the last item,
     // allowing for spacing specified by the second parameter.
     const POS_X: f32 = 0.0;
     const SPACING_BETWEEN_BUTTONS: f32 = 15.0;
     ui.same_line_spacing(POS_X, SPACING_BETWEEN_BUTTONS);
+
+    pressed
 }
 
 fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut State) {
@@ -105,13 +112,22 @@ fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut Stat
                 .scroll_bar(false)
                 .scrollable(false)
                 .build(|| {
-                    add_chat_button(im_str!("General"), &ui);
-                    add_chat_button(im_str!("Combat Log"), &ui);
-                    add_chat_button(im_str!("Whisper"), &ui);
-                    add_chat_button(im_str!("Group"), &ui);
-                    add_chat_button(im_str!("Guild"), &ui);
-                    ui.new_line();
 
+                    macro_rules! add_channel {
+                        ($channel_name:tt, $channel_value:tt, $state:ident, $ui:ident) => (
+                            let pressed = add_chat_button(im_str!($channel_name), &$ui);
+                            if pressed {
+                                $state.chat_button_pressed = Channel::new($channel_value);
+                            }
+                        )
+                    }
+                    add_channel!("General", 0, state, ui);
+                    add_channel!("Combat Log", 1, state, ui);
+                    add_channel!("Whisper", 2, state, ui);
+                    add_channel!("Group", 3, state, ui);
+                    add_channel!("Guild", 4, state, ui);
+
+                    ui.new_line();
                     ui.child_frame(im_str!(""), ImVec2::new(chat_w - 10.0, chat_h - 58.0))
                         .always_resizable(false)
                         .input_allow(true) // interacting with internal scrollbar.
@@ -119,7 +135,7 @@ fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut Stat
                         .always_show_horizontal_scroll_bar(false)
                         .show_scrollbar(true)
                         .build(|| {
-                            print_chat_messages(&ui, &state.chat_history);
+                            print_chat_messages(state.chat_button_pressed, &ui, &state.chat_history);
                         });
 
                     ui.input_text(im_str!("enter text..."), &mut state.chat_input_buffer)

@@ -7,14 +7,24 @@ pub struct ChatWindowConfig {
     pub pos: (f32, f32),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Channel(usize);
+
+impl Channel {
+    pub fn new(value: usize) -> Channel {
+        Channel(value)
+    }
+}
+
 #[derive(Clone)]
 pub struct ChatMessage {
-    msg: Vec<u8>
+    msg: Vec<u8>,
+    pub channel: Channel
 }
 
 impl ChatMessage {
-    pub fn new(bytes: Vec<u8>) -> ChatMessage {
-        ChatMessage { msg: bytes }
+    pub fn new(bytes: Vec<u8>, channel: Channel) -> ChatMessage {
+        ChatMessage { msg: bytes, channel: channel }
     }
 
     pub fn to_owned(&self) -> Vec<u8> {
@@ -39,14 +49,23 @@ pub struct ChatHistory {
 
 impl ChatHistory {
     pub fn new() -> ChatHistory {
-        const GENERAL_CHAT_HISTORY: &'static [&'static str] = &["Wizz: Hey\0", "Thorny: Yo\0", "Mufk: SUp man\0",
-            "Kazaghual: anyone w2b this axe I just found?\0",
-            "PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the dragon ok? NO FUCK YOU\0",
-            "Moo:grass plz\0",
-            "Aladin: STFU Jafar\0",
-            "Rocky: JKSLFJS\0",
-            "Diamond: In the sky...\0"];
-        let hst_collection: Vec<ChatMessage> = GENERAL_CHAT_HISTORY.iter().rev().map(|x| { ChatMessage::new((*x).to_string().into_bytes()) }).collect();
+        const CHAT_HISTORY_TEXT: &'static [(&'static str, Channel)] = &[
+            ("Wizz: Hey\0", Channel(0)),
+            ("Thorny: Yo\0", Channel(0)),
+            ("Mufk: SUp man\0", Channel(0)),
+            ("Kazaghual: anyone w2b this axe I just found?\0", Channel(2)),
+            ("PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the dragon ok? NO FUCK YOU\0", Channel(2)),
+            ("Moo:grass plz\0", Channel(3)),
+            ("Aladin: STFU Jafar\0", Channel(4)),
+            ("Rocky: JKSLFJS\0", Channel(5)),
+
+            ("You took 31 damage.\0", Channel(1)),
+            ("You've given 25 damage.\0", Channel(1)),
+            ("You took 61 damage.\0", Channel(1)),
+            ("You've given 20 damage.\0", Channel(1)),
+            ];
+
+        let hst_collection: Vec<ChatMessage> = CHAT_HISTORY_TEXT.iter().rev().map(|&(msg, chan)| { ChatMessage::new((*msg).to_string().into_bytes(), chan) }).collect();
         ChatHistory { history: hst_collection }
     }
 
