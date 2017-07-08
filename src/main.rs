@@ -69,11 +69,10 @@ fn main() {
 }
 
 fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: (f32, f32, f32, f32), msg_bytes: Vec<u8>) {
-    unsafe {
-        let msg_string: ImString = ImString::from_vec_unchecked(msg_bytes);
-        //ui.text_wrapped(&msg_string);
-        ui.text_colored(text_color, &msg_string);
-    }
+    let msg_string: ImString = unsafe { ImString::from_vec_unchecked(msg_bytes) };
+    ui.with_color_var(ImGuiCol::Text, ImVec4::from(text_color), || {
+        ui.text_wrapped(&msg_string);
+    });
 }
 
 fn print_chat_messages<'a>(channel_id: ChannelId, ui: &Ui<'a>, history: &ChatHistory) {
