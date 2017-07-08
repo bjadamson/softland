@@ -14,7 +14,7 @@ use self::support::Support;
 mod chat_history;
 mod support;
 
-const CLEAR_COLOR: (f32, f32, f32, f32) = (1.0, 1.0, 1.0, 1.0);
+const CLEAR_COLOR: (f32, f32, f32, f32) = (0.4, 0.7, 0.8, 0.89);
 
 struct Game {
     config: GameConfig,
@@ -41,11 +41,11 @@ fn main() {
         max_length_input_text: 128,
         pos: (0.0, 0.0),
         channels: ([
-            ("General", (1.0, 1.0, 1.0, 1.0)),
-            ("Combat Log", (1.0, 1.0, 1.0, 1.0)),
-            ("Whisper", (0.8, 0.0, 0.7, 1.0)),
-            ("Group", (0.2, 0.4, 0.9, 1.0)),
-            ("Guild", (0.1, 0.8, 0.3, 1.0)),
+            (im_str!("General"), (1.0, 1.0, 1.0, 1.0)),
+            (im_str!("Combat Log"), (1.0, 1.0, 1.0, 1.0)),
+            (im_str!("Whisper"), (0.8, 0.0, 0.7, 1.0)),
+            (im_str!("Group"), (0.2, 0.4, 0.9, 1.0)),
+            (im_str!("Guild"), (0.1, 0.8, 0.3, 1.0)),
             ])
         };
     let capacity = chat_config.max_length_input_text;
@@ -93,8 +93,8 @@ fn add_chat_button<'a>(text: &ImStr, ui: &Ui<'a>) -> bool {
     let dont_wrap = -1.0;
     let text_size = ui.calc_text_size(text, false, dont_wrap);
 
-    let button_padding = ImVec2::new(10.0, 7.0);
-    let pressed = ui.button(text, text_size + button_padding);
+    let button_size = ImVec2::new(10.0 + text_size.x, 7.0 + text_size.y);
+    let pressed = ui.button(text, button_size);
 
     // setting the POS_X to 0.0 tells imgui to place the next item immediately after the last item,
     // allowing for spacing specified by the second parameter.
@@ -133,11 +133,8 @@ fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut Stat
                         // 1) Add the channel to the chat_history
                         state.chat_history.add_channel(id, name, (r, g, b, a));
 
-                        // 2) Convert the &'static str to a ImString
-                        let s = ImString::new(String::from_utf8(name.as_bytes().to_owned()).unwrap()).unwrap();
-
-                        // 3) Draw the button for the chat channel.
-                        let pressed = add_chat_button(&s, &ui);
+                        // 2) Draw the button for the chat channel.
+                        let pressed = add_chat_button(name, &ui);
                         if pressed {
                             state.chat_button_pressed = id;
                         }

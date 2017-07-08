@@ -1,3 +1,5 @@
+use ImStr;
+
 pub struct ChatWindowConfig {
     pub dimensions: (f32, f32),
     pub offset: (f32, f32),
@@ -5,7 +7,7 @@ pub struct ChatWindowConfig {
     pub window_rounding: f32,
     pub max_length_input_text: usize,
     pub pos: (f32, f32),
-    pub channels: [(&'static str, (f32, f32, f32, f32)); 5]
+    pub channels: [(&'static ImStr, (f32, f32, f32, f32)); 5]
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
