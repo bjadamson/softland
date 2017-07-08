@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Benjamin Adamson <adamson.benjamin@gmail.com>"]
 
 [dependencies]
+itertools = "0.6.0"
+
 imgui = { version = "0.0.15-pre", path = "../overrides/imgui-rs" }
 
 gfx = "0.16"

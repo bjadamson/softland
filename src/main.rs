@@ -1,11 +1,14 @@
-extern crate glium;
 #[macro_use]
 extern crate imgui;
+extern crate itertools;
+
+extern crate glium;
 extern crate imgui_glium_renderer;
 
 use imgui::*;
-use chat_history::{Channel, ChatWindowConfig, ChatHistory, ChatMessage};
+use itertools::Itertools;
 
+use chat_history::{ChannelId, ChatWindowConfig, ChatHistory};
 use self::support::Support;
 
 mod chat_history;
@@ -26,7 +29,7 @@ struct GameConfig {
 struct State {
     chat_input_buffer: ImString,
     chat_history: ChatHistory,
-    chat_button_pressed: Channel
+    chat_button_pressed: ChannelId
 }
 
 fn main() {
@@ -36,7 +39,14 @@ fn main() {
         button_padding: 20.0,
         window_rounding: 0.0,
         max_length_input_text: 128,
-        pos: (0.0, 0.0)
+        pos: (0.0, 0.0),
+        channels: ([
+            ("General", (1.0, 1.0, 1.0, 1.0)),
+            ("Combat Log", (1.0, 1.0, 1.0, 1.0)),
+            ("Whisper", (0.8, 0.0, 0.7, 1.0)),
+            ("Group", (0.2, 0.4, 0.9, 1.0)),
+            ("Guild", (0.1, 0.8, 0.3, 1.0)),
+            ])
         };
     let capacity = chat_config.max_length_input_text;
     let config = GameConfig {
@@ -44,7 +54,7 @@ fn main() {
         chat_window_config: chat_config
         };
     let state = State { chat_input_buffer: ImString::with_capacity(capacity), chat_history: ChatHistory::new(),
-        chat_button_pressed: Channel::new(0)
+        chat_button_pressed: ChannelId::new(0)
         };
     let mut game = Game { config: config, state: state };
     let mut support = Support::init(game.config.window_dimensions);
@@ -58,20 +68,24 @@ fn main() {
     }
 }
 
-fn print_chat_msg<'a>(ui: &Ui<'a>, msg: &ChatMessage) {
-    let mut msg_string = msg.to_owned();
-    msg_string.push(b'\0');
+fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: (f32, f32, f32, f32), msg_bytes: Vec<u8>) {
     unsafe {
-        let msg_string: ImString = ImString::from_vec_unchecked(msg_string);
-        ui.text_wrapped(&msg_string);
+        let msg_string: ImString = ImString::from_vec_unchecked(msg_bytes);
+        //ui.text_wrapped(&msg_string);
+        ui.text_colored(text_color, &msg_string);
     }
 }
 
-fn print_chat_messages<'a>(channel: Channel, ui: &Ui<'a>, history: &ChatHistory) {
+fn print_chat_messages<'a>(channel_id: ChannelId, ui: &Ui<'a>, history: &ChatHistory) {
     // If looking at channel 0, show all results.
     // Otherwise only yield results for the channel.
-    for msg in history.iter().filter(|&msg| { channel == Channel::new(0) || msg.channel == channel }) {
-        print_chat_msg(&ui, &msg);
+    for msg in history.iter().filter(|&msg| { channel_id == ChannelId::new(0) || msg.channel_id == channel_id }) {
+        let mut msg_string = msg.to_owned();
+        msg_string.push(b'\0');
+
+        if let Some(channel) = history.lookup_channel(msg.channel_id) {
+            print_chat_msg(&ui, channel.text_color, msg_string);
+        }
     }
     ui.text_colored((0.0, 0.77, 0.46, 1.0), im_str!("Admin: Let there be color!"));
 }
@@ -113,19 +127,22 @@ fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut Stat
                 .scrollable(false)
                 .build(|| {
 
-                    macro_rules! add_channel {
-                        ($channel_name:tt, $channel_value:tt, $state:ident, $ui:ident) => (
-                            let pressed = add_chat_button(im_str!($channel_name), &$ui);
-                            if pressed {
-                                $state.chat_button_pressed = Channel::new($channel_value);
-                            }
-                        )
+                    for (count, &channels) in config.channels.iter().enumerate() {
+                        let (name, (r, g, b, a)) = channels;
+                        let id = ChannelId::new(count);
+
+                        // 1) Add the channel to the chat_history
+                        state.chat_history.add_channel(id, name, (r, g, b, a));
+
+                        // 2) Convert the &'static str to a ImString
+                        let s = ImString::new(String::from_utf8(name.as_bytes().to_owned()).unwrap()).unwrap();
+
+                        // 3) Draw the button for the chat channel.
+                        let pressed = add_chat_button(&s, &ui);
+                        if pressed {
+                            state.chat_button_pressed = id;
+                        }
                     }
-                    add_channel!("General", 0, state, ui);
-                    add_channel!("Combat Log", 1, state, ui);
-                    add_channel!("Whisper", 2, state, ui);
-                    add_channel!("Group", 3, state, ui);
-                    add_channel!("Guild", 4, state, ui);
 
                     ui.new_line();
                     ui.child_frame(im_str!(""), ImVec2::new(chat_w - 10.0, chat_h - 58.0))
@@ -161,7 +178,8 @@ fn run_game<'a>(ui: &Ui<'a>, game: &mut Game) {
 
     let chat_config = ChatWindowConfig { dimensions: (chat_w, chat_h), offset: (offset_x, offset_y),
         button_padding: config.button_padding, window_rounding: config.window_rounding,
-        max_length_input_text: max_input_length, pos: (chat_x, chat_y)
+        max_length_input_text: max_input_length, pos: (chat_x, chat_y),
+        channels: config.channels
         };
 
     show_chat_window(ui, &chat_config, &mut game.state)
