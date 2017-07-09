@@ -27,8 +27,8 @@ pub struct ChatMessage {
 }
 
 impl ChatMessage {
-    pub fn new(bytes: Vec<u8>, channel_id: ChannelId) -> ChatMessage {
-        ChatMessage { msg: bytes, channel_id: channel_id }
+    pub fn new<B: Into<Vec<u8>>>(bytes: B, channel_id: ChannelId) -> ChatMessage {
+        ChatMessage { msg: bytes.into(), channel_id: channel_id }
     }
 
     pub fn to_owned(&self) -> Vec<u8> {
@@ -105,6 +105,15 @@ impl ChatHistory {
             f.name = String::from(name);
             Some(f)
         }).is_some()
+    }
+
+    pub fn send_message_u8(&mut self, id: ChannelId, msg: &[u8]) {
+        let msg = ChatMessage::new(msg.to_owned(), id);
+        self.history.push(msg);
+    }
+
+    pub fn send_message_str(&mut self, id: ChannelId, msg: &str) {
+        self.send_message_u8(id, msg.as_bytes())
     }
 }
 
