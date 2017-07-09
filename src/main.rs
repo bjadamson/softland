@@ -79,11 +79,11 @@ fn main() {
         ("You've given 20 damage.", ChannelId::new(1)),
     ];
     let init_channels = vec![
-        (String::from("General"), (1.0, 1.0, 1.0, 1.0)),
-        (String::from("Combat Log"), (0.7, 0.2, 0.1, 1.0)),
-        (String::from("Whisper"), (0.8, 0.0, 0.7, 1.0)),
-        (String::from("Group"), (0.2, 0.4, 0.9, 1.0)),
-        (String::from("Guild"), (0.1, 0.8, 0.3, 1.0)),
+        (String::from("General"), [1.0, 1.0, 1.0, 1.0]),
+        (String::from("Combat Log"), [0.7, 0.2, 0.1, 1.0]),
+        (String::from("Whisper"), [0.8, 0.0, 0.7, 1.0]),
+        (String::from("Group"), [0.2, 0.4, 0.9, 1.0]),
+        (String::from("Guild"), [0.1, 0.8, 0.3, 1.0]),
     ];
     let mut state = State {
         chat_input_buffer: ImString::with_capacity(chat_buffer_capacity),
@@ -106,7 +106,14 @@ fn main() {
     }
 }
 
-fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: (f32, f32, f32, f32), msg_bytes: Vec<u8>) {
+fn run_game<'a>(ui: &Ui<'a>, state: &mut State) {
+    show_main_menu(ui, state);
+
+    set_chat_window_pos(state);
+    show_chat_window(ui, state)
+}
+
+fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: [f32; 4], msg_bytes: Vec<u8>) {
     let msg_string: ImString = unsafe { ImString::from_vec_unchecked(msg_bytes) };
     ui.with_color_var(ImGuiCol::Text, ImVec4::from(text_color), || {
         ui.text_wrapped(&msg_string);
@@ -123,12 +130,12 @@ fn print_chat_messages<'a>(channel_id: ChannelId, ui: &Ui<'a>, history: &ChatHis
     }
 }
 
-fn add_chat_button<'a>(text: &ImStr, button_color: (f32, f32, f32, f32), text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
+fn add_chat_button<'a>(text: &ImStr, button_color: [f32; 4], text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
     let dont_wrap = -1.0;
     let text_size = ui.calc_text_size(text, false, dont_wrap);
 
     const COLOR_FACTOR: f32 = 4.0;
-    let (r, g, b, a) = button_color;
+    let (r, g, b, a) = (button_color[0], button_color[1], button_color[2], button_color[3]);
     let button_color = (r, g, b, a / COLOR_FACTOR);
 
     let (padding_x, padding_y) = text_padding;
@@ -180,48 +187,48 @@ fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, id: ChannelId, channel_name
 fn create_set_channel_text_color_popup<'a>(ui: &Ui<'a>, id: ChannelId, state: &mut State) {
     ui.popup(im_str!("Edit Text Color"), || {
         state.chat_history.lookup_channel_mut(id).and_then(|mut channel| {
-            let &mut (mut r, mut g, mut b, mut a) = &mut channel.text_color;
-            ui.text_colored((0.4, 0.4, 0.4, 1.0), im_str!("Edit text color for channel: "));
-            ui.same_line(0.0);
+            {
+                ui.text_colored((0.4, 0.4, 0.4, 1.0), im_str!("Edit text color for channel: "));
+                ui.same_line(0.0);
 
-            let channel_name = unsafe { ImString::from_string_unchecked(channel.name.clone()) };
+                let channel_name = unsafe { ImString::from_string_unchecked(channel.name.clone()) };
+                ui.text_colored(channel.text_color.clone(), &channel_name);
+                ui.new_line();
+                ui.new_line();
 
-            let color = (r, g, b, a);
-            ui.text_colored(color, &channel_name);
-            ui.new_line();
-            ui.new_line();
+                const ALPHA: f32 = 0.7;
+                let colors = &mut channel.text_color;
+                ui.with_color_var(ImGuiCol::Text, (1.0, 0.0, 0.0, ALPHA), || {
+                    ui.input_float(im_str!("R"), &mut colors[0])
+                        .chars_decimal(true)
+                        .enter_returns_true(true)
+                        .auto_select_all(true)
+                        .build();
+                });
+                ui.with_color_var(ImGuiCol::Text, (0.0, 1.0, 0.0, ALPHA), || {
+                    ui.input_float(im_str!("G"), &mut colors[1])
+                        .chars_decimal(true)
+                        .enter_returns_true(true)
+                        .auto_select_all(true)
+                        .build();
+                });
+                ui.with_color_var(ImGuiCol::Text, (0.0, 0.0, 1.0, ALPHA), || {
+                    ui.input_float(im_str!("B"), &mut colors[2])
+                        .chars_decimal(true)
+                        .enter_returns_true(true)
+                        .auto_select_all(true)
+                        .build();
+                });
+                ui.with_color_var(ImGuiCol::Text, (1.0, 1.0, 1.0, ALPHA), || {
+                    ui.input_float(im_str!("A"), &mut colors[3])
+                        .chars_decimal(true)
+                        .enter_returns_true(true)
+                        .auto_select_all(true)
+                        .build();
+                });
+            }
 
-            const ALPHA: f32 = 0.7;
-
-            ui.with_color_var(ImGuiCol::Text, (1.0, 0.0, 0.0, ALPHA), || {
-                ui.input_float(im_str!("R"), &mut r)
-                    .chars_decimal(true)
-                    .enter_returns_true(true)
-                    .auto_select_all(true)
-                    .build();
-            });
-            ui.with_color_var(ImGuiCol::Text, (0.0, 1.0, 0.0, ALPHA), || {
-                ui.input_float(im_str!("G"), &mut g)
-                    .chars_decimal(true)
-                    .enter_returns_true(true)
-                    .auto_select_all(true)
-                    .build();
-            });
-            ui.with_color_var(ImGuiCol::Text, (0.0, 0.0, 1.0, ALPHA), || {
-                ui.input_float(im_str!("B"), &mut b)
-                    .chars_decimal(true)
-                    .enter_returns_true(true)
-                    .auto_select_all(true)
-                    .build();
-            });
-            ui.with_color_var(ImGuiCol::Text, (1.0, 1.0, 1.0, ALPHA), || {
-                ui.input_float(im_str!("A"), &mut a)
-                    .chars_decimal(true)
-                    .enter_returns_true(true)
-                    .auto_select_all(true)
-                    .build();
-            });
-
+            // TODO: this may be incorrect..
             Some(channel)
         });
         let button_size = (100.0, 20.0);
@@ -374,11 +381,4 @@ fn set_chat_window_pos<'a>(state: &mut State) {
 
     let chat_config = &mut state.chat_window_state;
     chat_config.pos = chat_pos;
-}
-
-fn run_game<'a>(ui: &Ui<'a>, state: &mut State) {
-    show_main_menu(ui, state);
-
-    set_chat_window_pos(state);
-    show_chat_window(ui, state)
 }

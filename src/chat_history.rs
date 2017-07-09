@@ -11,11 +11,11 @@ impl ChannelId {
 pub struct Channel {
     pub id: ChannelId,
     pub name: String,
-    pub text_color: (f32, f32, f32, f32)
+    pub text_color: [f32; 4]
 }
 
 impl Channel {
-    pub fn new(id: ChannelId, name: &str, text_color: (f32, f32, f32, f32)) -> Channel {
+    pub fn new(id: ChannelId, name: &str, text_color: [f32; 4]) -> Channel {
         Channel { id: id, name: name.to_owned(), text_color: text_color }
     }
 }
@@ -56,19 +56,19 @@ impl ChatHistory {
         ChatHistory { history: vec![], history_backup: vec![], channels: vec![] }
     }
 
-    pub fn from_existing<'a>(channels: &[((String), (f32, f32, f32, f32))], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
+    pub fn from_existing<'a>(channels: &[((String), [f32; 4])], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
         let mut chat_history = ChatHistory::new();
         chat_history.history = history.iter().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
 
         for (idx, channels) in channels.iter().enumerate() {
-            let &(ref name, (r, g, b, a)) = channels;
+            let &(ref name, color) = channels;
             let id = ChannelId::new(idx);
-            chat_history.add_channel(id, &name, (r, g, b, a));
+            chat_history.add_channel(id, &name, color);
         }
         chat_history
     }
 
-    pub fn channel_names(&self) -> Vec<(String, (f32, f32, f32, f32))> {
+    pub fn channel_names(&self) -> Vec<(String, [f32; 4])> {
         let copy_channel_name = |c: &Channel| {
             (c.name.clone(), c.text_color)
         };
@@ -82,7 +82,7 @@ impl ChatHistory {
     pub fn lookup_channel(&self, id: ChannelId) -> Option<&Channel> {
         self.channels.iter().filter(|x| {x.id == id}).next()
     }
-    pub fn add_channel(&mut self, id: ChannelId, name: &str, text_color: (f32, f32, f32, f32)) -> bool {
+    pub fn add_channel(&mut self, id: ChannelId, name: &str, text_color: [f32; 4]) -> bool {
         let channel_already_present = self.channel_present(id);
         if !channel_already_present {
             // We don't add the channel if it's already present.
