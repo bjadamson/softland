@@ -34,7 +34,7 @@ enum EditingFieldOption {
     NotEditing,
     EditChatHistoryMaximumLength(i32),
     EditChannelName(ChannelId, String),
-    EditChannelColorText((f32, f32, f32, f32)),
+    EditChannelColorText(ChannelId),
 }
 
 struct State {
@@ -63,6 +63,7 @@ fn main() {
     let chat_buffer_capacity = chat_config.max_length_chat_input_text;
     let menu_input_buffer_capacity = chat_config.max_length_menu_input_text;
     let chat_history_text = &[
+        ("Welcome to the server 'Turnshroom Habitat'", ChannelId::new(0)),
         ("Wizz: Hey", ChannelId::new(0)),
         ("Thorny: Yo", ChannelId::new(0)),
         ("Mufk: SUp man", ChannelId::new(0)),
@@ -116,14 +117,10 @@ fn print_chat_messages<'a>(channel_id: ChannelId, ui: &Ui<'a>, history: &ChatHis
     // If looking at channel 0, show all results.
     // Otherwise only yield results for the channel.
     for msg in history.iter().filter(|&msg| { channel_id == ChannelId::new(0) || msg.channel_id == channel_id }) {
-        let mut msg_string = msg.to_owned();
-        msg_string.push(b'\0');
-
         if let Some(channel) = history.lookup_channel(msg.channel_id) {
-            print_chat_msg(&ui, channel.text_color, msg_string);
+            print_chat_msg(&ui, channel.text_color, msg.to_owned());
         }
     }
-    ui.text_colored((0.0, 0.77, 0.46, 1.0), im_str!("Admin: Let there be color!"));
 }
 
 fn add_chat_button<'a>(text: &ImStr, button_color: (f32, f32, f32, f32), text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
@@ -180,6 +177,65 @@ fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, id: ChannelId, channel_name
     });
 }
 
+fn create_set_channel_text_color_popup<'a>(ui: &Ui<'a>, id: ChannelId, state: &mut State) {
+    ui.popup(im_str!("Edit Text Color"), || {
+        state.chat_history.lookup_channel_mut(id).and_then(|mut channel| {
+            let &mut (mut r, mut g, mut b, mut a) = &mut channel.text_color;
+            ui.text_colored((0.4, 0.4, 0.4, 1.0), im_str!("Edit text color for channel: "));
+            ui.same_line(0.0);
+
+            let channel_name = unsafe { ImString::from_string_unchecked(channel.name.clone()) };
+
+            let color = (r, g, b, a);
+            ui.text_colored(color, &channel_name);
+            ui.new_line();
+            ui.new_line();
+
+            const ALPHA: f32 = 0.7;
+
+            ui.with_color_var(ImGuiCol::Text, (1.0, 0.0, 0.0, ALPHA), || {
+                ui.input_float(im_str!("R"), &mut r)
+                    .chars_decimal(true)
+                    .enter_returns_true(true)
+                    .auto_select_all(true)
+                    .build();
+            });
+            ui.with_color_var(ImGuiCol::Text, (0.0, 1.0, 0.0, ALPHA), || {
+                ui.input_float(im_str!("G"), &mut g)
+                    .chars_decimal(true)
+                    .enter_returns_true(true)
+                    .auto_select_all(true)
+                    .build();
+            });
+            ui.with_color_var(ImGuiCol::Text, (0.0, 0.0, 1.0, ALPHA), || {
+                ui.input_float(im_str!("B"), &mut b)
+                    .chars_decimal(true)
+                    .enter_returns_true(true)
+                    .auto_select_all(true)
+                    .build();
+            });
+            ui.with_color_var(ImGuiCol::Text, (1.0, 1.0, 1.0, ALPHA), || {
+                ui.input_float(im_str!("A"), &mut a)
+                    .chars_decimal(true)
+                    .enter_returns_true(true)
+                    .auto_select_all(true)
+                    .build();
+            });
+
+            Some(channel)
+        });
+        let button_size = (100.0, 20.0);
+        let mut button_was_pressed = ui.button(im_str!("Cancel"), button_size);
+        ui.same_line_spacing(0.0, 15.0);
+        button_was_pressed |= ui.button(im_str!("Ok"), button_size);
+
+        if button_was_pressed {
+            state.editing_field = EditingFieldOption::NotEditing;
+            ui.close_current_popup();
+        }
+    });
+}
+
 fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
@@ -199,14 +255,15 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
             ui.menu_item(im_str!("Movable")).selected(&mut state.chat_window_state.movable).build();
             ui.menu_item(im_str!("Resizable")).selected(&mut state.chat_window_state.resizable).build();
             ui.menu_item(im_str!("Save Settings")).selected(&mut state.chat_window_state.save_settings).build();
-            for (idx, &(ref channel_name, text_color)) in state.chat_history.channel_names().iter().enumerate() {
+            for (idx, &(ref channel_name, _)) in state.chat_history.channel_names().iter().enumerate() {
                 let cn = unsafe { ImString::from_string_unchecked(channel_name.clone()) };
                 ui.menu(&cn).build(|| {
+                    let channel_id = ChannelId::new(idx);
                     if ui.menu_item(im_str!("Name")).build() {
-                        state.editing_field = EditingFieldOption::EditChannelName(ChannelId::new(idx), channel_name.to_owned());
+                        state.editing_field = EditingFieldOption::EditChannelName(channel_id, channel_name.to_owned());
                     }
                     if ui.menu_item(im_str!("Color")).build() {
-                        state.editing_field = EditingFieldOption::EditChannelColorText(text_color);
+                        state.editing_field = EditingFieldOption::EditChannelColorText(channel_id);
                     }
                     ui.menu_item(im_str!("Font")).build();
                 });
@@ -219,7 +276,8 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
             create_rename_chat_channel_popup(&ui, id, &name, state);
             ui.open_popup(im_str!("Edit Channel Name"));
         },
-        EditingFieldOption::EditChannelColorText(color) => {
+        EditingFieldOption::EditChannelColorText(id) => {
+            create_set_channel_text_color_popup(&ui, id, state);
             ui.open_popup(im_str!("Edit Text Color"));
         },
         EditingFieldOption::EditChatHistoryMaximumLength(length) => {},

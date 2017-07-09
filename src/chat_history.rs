@@ -7,7 +7,7 @@ impl ChannelId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Channel {
     pub id: ChannelId,
     pub name: String,
@@ -20,7 +20,6 @@ impl Channel {
     }
 }
 
-#[derive(Clone)]
 pub struct ChatMessage {
     pub msg: Vec<u8>,
     pub channel_id: ChannelId
@@ -46,7 +45,6 @@ impl Iterator for ChatMessage {
     }
 }
 
-#[derive(Clone)]
 pub struct ChatHistory {
     history: Vec<ChatMessage>,
     history_backup: Vec<ChatMessage>,
@@ -60,7 +58,7 @@ impl ChatHistory {
 
     pub fn from_existing<'a>(channels: &[((String), (f32, f32, f32, f32))], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
         let mut chat_history = ChatHistory::new();
-        chat_history.history = history.iter().rev().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
+        chat_history.history = history.iter().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
 
         for (idx, channels) in channels.iter().enumerate() {
             let &(ref name, (r, g, b, a)) = channels;
@@ -77,7 +75,7 @@ impl ChatHistory {
         self.channels.iter().map(copy_channel_name).collect()
     }
 
-    fn lookup_channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
+    pub fn lookup_channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
         self.channels.iter_mut().filter(|x| {x.id == id}).next()
     }
 
