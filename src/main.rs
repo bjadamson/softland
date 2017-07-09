@@ -29,10 +29,11 @@ pub struct ChatWindowState {
     pub save_settings: bool,
 }
 
+#[derive(Clone, Debug)]
 enum EditingFieldOption {
     NotEditing,
     EditChatHistoryMaximumLength(i32),
-    EditChannelName(String),
+    EditChannelName(ChannelId, String),
     EditChannelColorText((f32, f32, f32, f32)),
 }
 
@@ -78,7 +79,7 @@ fn main() {
     ];
     let init_channels = vec![
         (String::from("General"), (1.0, 1.0, 1.0, 1.0)),
-        (String::from("Combat Log"), (1.0, 1.0, 1.0, 1.0)),
+        (String::from("Combat Log"), (0.7, 0.2, 0.1, 1.0)),
         (String::from("Whisper"), (0.8, 0.0, 0.7, 1.0)),
         (String::from("Group"), (0.2, 0.4, 0.9, 1.0)),
         (String::from("Guild"), (0.1, 0.8, 0.3, 1.0)),
@@ -125,13 +126,21 @@ fn print_chat_messages<'a>(channel_id: ChannelId, ui: &Ui<'a>, history: &ChatHis
     ui.text_colored((0.0, 0.77, 0.46, 1.0), im_str!("Admin: Let there be color!"));
 }
 
-fn add_chat_button<'a>(text: &ImStr, text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
+fn add_chat_button<'a>(text: &ImStr, button_color: (f32, f32, f32, f32), text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
     let dont_wrap = -1.0;
     let text_size = ui.calc_text_size(text, false, dont_wrap);
 
+    const COLOR_FACTOR: f32 = 4.0;
+    let (r, g, b, a) = button_color;
+    let button_color = (r, g, b, a / COLOR_FACTOR);
+
     let (padding_x, padding_y) = text_padding;
     let button_size = ImVec2::new(text_size.x + padding_x, text_size.y + padding_y);
-    let pressed = ui.button(text, button_size);
+
+    let mut pressed = false;
+    ui.with_color_var(ImGuiCol::Button, button_color, || {
+        pressed = ui.button(text, button_size);
+    });
 
     // setting the POS_X to 0.0 tells imgui to place the next item immediately after the last item,
     // allowing for spacing specified by the second parameter.
@@ -142,35 +151,36 @@ fn add_chat_button<'a>(text: &ImStr, text_padding: (f32, f32), ui: &Ui<'a>) -> b
     pressed
 }
 
-fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, state: &mut State) {
+fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, id: ChannelId, channel_name: &str, state: &mut State) {    
     ui.popup(im_str!("Edit Channel Name"), || {
-        ui.input_text(im_str!("Enter a new channel name"), &mut state.menu_input_buffer)
-                    .flags(ImGuiInputTextFlags_CharsNoBlank)
-                    .flags(ImGuiInputTextFlags_CharsUppercase)
-                    .auto_select_all(true)
-                    .build();
-        let button_size = (100.0, 20.0);
-        if ui.button(im_str!("Cancel"), button_size) {
-            state.editing_field = EditingFieldOption::NotEditing;
-            ui.close_current_popup();
+        if state.menu_input_buffer.is_empty() {
+            state.menu_input_buffer.push_str(channel_name);
         }
+        ui.input_text(im_str!("Enter a new channel name"), &mut state.menu_input_buffer)
+            .auto_select_all(true)
+            .chars_noblank(true)
+            .chars_uppercase(true)
+            .build();
+        let button_size = (100.0, 20.0);
+        let mut button_was_pressed = ui.button(im_str!("Cancel"), button_size);
         ui.same_line_spacing(0.0, 15.0);
         if ui.button(im_str!("Ok"), button_size) {
-            let renamed = state.chat_history.rename_channel(ChannelId::new(0), &state.menu_input_buffer);
+            button_was_pressed = true;
+            let renamed = state.chat_history.rename_channel(id, &state.menu_input_buffer);
             if !renamed {
                 panic!("error renaming channel!");
             }
+        }
+
+        if button_was_pressed {
             state.editing_field = EditingFieldOption::NotEditing;
+            state.menu_input_buffer.clear();
             ui.close_current_popup();
         }
     });
 }
 
 fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
-    // 1) Create the popups within imgui.
-    create_rename_chat_channel_popup(&ui, state);
-
-    // 2) Show the menu, and maybe a popup
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
             ui.menu_item(im_str!("Exit")).build();
@@ -189,11 +199,11 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
             ui.menu_item(im_str!("Movable")).selected(&mut state.chat_window_state.movable).build();
             ui.menu_item(im_str!("Resizable")).selected(&mut state.chat_window_state.resizable).build();
             ui.menu_item(im_str!("Save Settings")).selected(&mut state.chat_window_state.save_settings).build();
-            for &(ref channel_name, text_color) in state.chat_history.channel_names().iter() {
+            for (idx, &(ref channel_name, text_color)) in state.chat_history.channel_names().iter().enumerate() {
                 let cn = unsafe { ImString::from_string_unchecked(channel_name.clone()) };
                 ui.menu(&cn).build(|| {
                     if ui.menu_item(im_str!("Name")).build() {
-                        state.editing_field = EditingFieldOption::EditChannelName(channel_name.clone());
+                        state.editing_field = EditingFieldOption::EditChannelName(ChannelId::new(idx), channel_name.to_owned());
                     }
                     if ui.menu_item(im_str!("Color")).build() {
                         state.editing_field = EditingFieldOption::EditChannelColorText(text_color);
@@ -204,8 +214,9 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
         });
     });
 
-    match state.editing_field {
-        EditingFieldOption::EditChannelName(ref name) => {
+    match state.editing_field.clone() {
+        EditingFieldOption::EditChannelName(id, name) => {
+            create_rename_chat_channel_popup(&ui, id, &name, state);
             ui.open_popup(im_str!("Edit Channel Name"));
         },
         EditingFieldOption::EditChannelColorText(color) => {
@@ -222,7 +233,6 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
     let window_rounding = StyleVar::WindowRounding(state.chat_window_state.window_rounding);
     let (chat_w, chat_h) = state.chat_window_state.dimensions;
     let (chat_w, chat_h) = (chat_w as f32, chat_h as f32);
-    let (chat_x, chat_y) = state.chat_window_state.pos;
     let window_pos = state.chat_window_state.pos;
     //let button_height = state.button_padding;
 
@@ -242,15 +252,15 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
             .scrollable(false)
             .build(|| {
                 for (count, channels) in state.chat_history.channel_names().iter().enumerate() {
-                    let &(ref name, (r, g, b, a)) = channels;
+                    let &(ref name, color) = channels;
                     let id = ChannelId::new(count);
 
                     // 1) Add the channel to the chat_history
-                    state.chat_history.add_channel(id, &name, (r, g, b, a));
+                    state.chat_history.add_channel(id, &name, color);
 
                     // 2) Draw the button for the chat channel.
                     let name = unsafe { ImString::from_string_unchecked(name.clone()) };
-                    let pressed = add_chat_button(&name, (10.0, 7.0), &ui);
+                    let pressed = add_chat_button(&name, color, (10.0, 7.0), &ui);
                     if pressed {
                         state.chat_button_pressed = id;
                     }
