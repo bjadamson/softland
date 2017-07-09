@@ -180,6 +180,12 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
         });
         ui.menu(im_str!("Chat")).build(|| {
             ui.menu_item(im_str!("Maximum History")).build();
+            if ui.menu_item(im_str!("Clear")).build() {
+                state.chat_history.clear();
+            }
+            if ui.menu_item(im_str!("Restore")).build() {
+                state.chat_history.restore();
+            }
             ui.menu_item(im_str!("Movable")).selected(&mut state.chat_window_state.movable).build();
             ui.menu_item(im_str!("Resizable")).selected(&mut state.chat_window_state.resizable).build();
             ui.menu_item(im_str!("Save Settings")).selected(&mut state.chat_window_state.save_settings).build();

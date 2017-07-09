@@ -49,12 +49,13 @@ impl Iterator for ChatMessage {
 #[derive(Clone)]
 pub struct ChatHistory {
     history: Vec<ChatMessage>,
+    history_backup: Vec<ChatMessage>,
     channels: Vec<Channel>
 }
 
 impl ChatHistory {
     pub fn new<'a>() -> ChatHistory {
-        ChatHistory { history: vec![], channels: vec![] }
+        ChatHistory { history: vec![], history_backup: vec![], channels: vec![] }
     }
 
     pub fn from_existing<'a>(channels: &[((String), (f32, f32, f32, f32))], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
@@ -76,10 +77,6 @@ impl ChatHistory {
         self.channels.iter().map(copy_channel_name).collect()
     }
 
-    pub fn iter<'a>(&'a self) -> ChatHistoryIterator<'a> {
-        ChatHistoryIterator::new(&self.history)
-    }
-
     fn lookup_channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
         self.channels.iter_mut().filter(|x| {x.id == id}).next()
     }
@@ -94,6 +91,19 @@ impl ChatHistory {
             self.channels.push(Channel::new(id, name, text_color));
         }
         channel_already_present
+    }
+
+    pub fn clear(&mut self) {
+        // Move everything from history into history_backup
+        self.history_backup.append(&mut self.history);
+    }
+
+    pub fn restore(&mut self) {
+        // 1) flush everything currently in recent history to the end of the history backup
+        self.clear();
+
+        // 2) Move everything from backup to recent history
+        self.history.append(&mut self.history_backup);
     }
 
     fn channel_present(&self, id: ChannelId) -> bool {
@@ -112,8 +122,12 @@ impl ChatHistory {
         self.history.push(msg);
     }
 
-    pub fn send_message_str(&mut self, id: ChannelId, msg: &str) {
-        self.send_message_u8(id, msg.as_bytes())
+    ///pub fn send_message_str(&mut self, id: ChannelId, msg: &str) {
+    ///    self.send_message_u8(id, msg.as_bytes())
+    ///}
+
+    pub fn iter<'a>(&'a self) -> ChatHistoryIterator<'a> {
+        ChatHistoryIterator::new(&self.history)
     }
 }
 
