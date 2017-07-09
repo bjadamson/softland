@@ -9,18 +9,24 @@ use imgui::*;
 use itertools::Itertools;
 
 use chat_history::{ChannelId, ChatHistory};
-use chat_window::ChatWindowConfig;
 use self::support::Support;
 
 mod chat_history;
-mod chat_window;
 mod support;
 
 const CLEAR_COLOR: (f32, f32, f32, f32) = (0.2, 0.7, 0.8, 0.89);
 
-struct GameConfig {
-    window_dimensions: (u32, u32),
-    chat_window_config: ChatWindowConfig
+pub struct ChatWindowState {
+    pub dimensions: (f32, f32),
+    pub offset: (f32, f32),
+    pub button_padding: f32,
+    pub window_rounding: f32,
+    pub max_length_chat_input_text: usize,
+    pub max_length_menu_input_text: usize,
+    pub pos: (f32, f32),
+    pub movable: bool,
+    pub resizable: bool,
+    pub save_settings: bool,
 }
 
 enum EditingFieldOption {
@@ -33,18 +39,15 @@ enum EditingFieldOption {
 struct State {
     chat_input_buffer: ImString,
     menu_input_buffer: ImString,
+    chat_window_state: ChatWindowState,
     chat_history: ChatHistory,
     chat_button_pressed: ChannelId,
-    editing_field: EditingFieldOption
-}
-
-struct Game {
-    config: GameConfig,
-    state: State
+    editing_field: EditingFieldOption,
+    window_dimensions: (u32, u32),
 }
 
 fn main() {
-    let chat_config = ChatWindowConfig {
+    let chat_config = ChatWindowState {
         dimensions: (480.0, 200.0),
         offset: (10.0, 6.0),
         button_padding: 20.0,
@@ -52,28 +55,27 @@ fn main() {
         max_length_chat_input_text: 128,
         max_length_menu_input_text: 10,
         pos: (0.0, 0.0),
+        movable: false,
+        resizable: false,
+        save_settings: false
         };
     let chat_buffer_capacity = chat_config.max_length_chat_input_text;
     let menu_input_buffer_capacity = chat_config.max_length_menu_input_text;
-    let config = GameConfig {
-        window_dimensions: (1024, 768),
-        chat_window_config: chat_config
-        };
-        let chat_history_text = &[
-            ("Wizz: Hey", ChannelId::new(0)),
-            ("Thorny: Yo", ChannelId::new(0)),
-            ("Mufk: SUp man", ChannelId::new(0)),
-            ("Kazaghual: anyone w2b this axe I just found?", ChannelId::new(2)),
-            ("PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the dragon ok?", ChannelId::new(2)),
-            ("Moo:grass plz", ChannelId::new(3)),
-            ("Aladin: STFU Jafar", ChannelId::new(4)),
-            ("Rocky: JKSLFJS", ChannelId::new(5)),
+    let chat_history_text = &[
+        ("Wizz: Hey", ChannelId::new(0)),
+        ("Thorny: Yo", ChannelId::new(0)),
+        ("Mufk: SUp man", ChannelId::new(0)),
+        ("Kazaghual: anyone w2b this axe I just found?", ChannelId::new(2)),
+        ("PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the dragon ok?", ChannelId::new(2)),
+        ("Moo:grass plz", ChannelId::new(3)),
+        ("Aladin: STFU Jafar", ChannelId::new(4)),
+        ("Rocky: JKSLFJS", ChannelId::new(5)),
 
-            ("You took 31 damage.", ChannelId::new(1)),
-            ("You've given 25 damage.", ChannelId::new(1)),
-            ("You took 61 damage.", ChannelId::new(1)),
-            ("You've given 20 damage.", ChannelId::new(1)),
-        ];
+        ("You took 31 damage.", ChannelId::new(1)),
+        ("You've given 25 damage.", ChannelId::new(1)),
+        ("You took 61 damage.", ChannelId::new(1)),
+        ("You've given 20 damage.", ChannelId::new(1)),
+    ];
     let init_channels = vec![
         (String::from("General"), (1.0, 1.0, 1.0, 1.0)),
         (String::from("Combat Log"), (1.0, 1.0, 1.0, 1.0)),
@@ -81,19 +83,20 @@ fn main() {
         (String::from("Group"), (0.2, 0.4, 0.9, 1.0)),
         (String::from("Guild"), (0.1, 0.8, 0.3, 1.0)),
     ];
-    let state = State {
+    let mut state = State {
         chat_input_buffer: ImString::with_capacity(chat_buffer_capacity),
         menu_input_buffer: ImString::with_capacity(menu_input_buffer_capacity),
         chat_history: ChatHistory::from_existing(&init_channels, chat_history_text),
         chat_button_pressed: ChannelId::new(0),
-        editing_field: EditingFieldOption::NotEditing
+        chat_window_state: chat_config,
+        editing_field: EditingFieldOption::NotEditing,
+        window_dimensions: (1024, 768),
         };
 
-    let mut game = Game { config: config, state: state };
-    let mut support = Support::init(game.config.window_dimensions);
+    let mut support = Support::init(state.window_dimensions);
 
     loop {
-        support.render(CLEAR_COLOR, &mut game, run_game);
+        support.render(CLEAR_COLOR, &mut state, run_game);
         let active = support.update_events();
         if !active {
             break;
@@ -177,6 +180,9 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
         });
         ui.menu(im_str!("Chat")).build(|| {
             ui.menu_item(im_str!("Maximum History")).build();
+            ui.menu_item(im_str!("Movable")).selected(&mut state.chat_window_state.movable).build();
+            ui.menu_item(im_str!("Resizable")).selected(&mut state.chat_window_state.resizable).build();
+            ui.menu_item(im_str!("Save Settings")).selected(&mut state.chat_window_state.save_settings).build();
             for &(ref channel_name, text_color) in state.chat_history.channel_names().iter() {
                 let cn = unsafe { ImString::from_string_unchecked(channel_name.clone()) };
                 ui.menu(&cn).build(|| {
@@ -206,19 +212,22 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
     };
 }
 
-fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut State) {
-    let (chat_w, chat_h) = config.dimensions;
-    let (chat_x, chat_y) = config.pos;
-    //let button_height = config.button_padding;
+fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
+    let window_rounding = StyleVar::WindowRounding(state.chat_window_state.window_rounding);
+    let (chat_w, chat_h) = state.chat_window_state.dimensions;
+    let (chat_w, chat_h) = (chat_w as f32, chat_h as f32);
+    let (chat_x, chat_y) = state.chat_window_state.pos;
+    let window_pos = state.chat_window_state.pos;
+    //let button_height = state.button_padding;
 
-    ui.with_style_var(StyleVar::WindowRounding(config.window_rounding), || {
+    ui.with_style_var(window_rounding, || {
         ui.window(im_str!("ChatWindow"))
-            .position((chat_x, chat_y), ImGuiSetCond_FirstUseEver)
+            .position(window_pos, ImGuiSetCond_FirstUseEver)
             .size((chat_w, chat_h), ImGuiSetCond_FirstUseEver)
             .title_bar(false)
-            .movable(true)
-            .resizable(false)
-            .save_settings(false)
+            .movable(state.chat_window_state.movable)
+            .resizable(state.chat_window_state.resizable)
+            .save_settings(state.chat_window_state.save_settings)
             .inputs(true)  // interacting with buttons.
             .no_bring_to_front_on_focus(true)
             .show_borders(false)
@@ -273,8 +282,8 @@ fn show_chat_window<'a>(ui: &Ui<'a>, config: &ChatWindowConfig, state: &mut Stat
     });
 }
 
-fn set_chat_window_pos<'a>(game: &mut Game) {
-    fn calculate_chat_window_position(window_dimensions: (u32, u32), config: &ChatWindowConfig) -> (f32, f32) {
+fn set_chat_window_pos<'a>(state: &mut State) {
+    fn calculate_chat_window_position(window_dimensions: (u32, u32), config: &ChatWindowState) -> (f32, f32) {
         let (_, window_h) = window_dimensions;
         let window_h = window_h as f32;
         let (_, chat_h) = config.dimensions;
@@ -283,20 +292,19 @@ fn set_chat_window_pos<'a>(game: &mut Game) {
         let (chat_x, chat_y) = (0.0 + offset_x, window_h - chat_h - offset_y);
         (chat_x, chat_y)
     }
-    let window_dimensions = game.config.window_dimensions;
+    let window_dimensions = state.window_dimensions;
     let chat_pos = {
-        let chat_config = &game.config.chat_window_config;
+        let chat_config = &state.chat_window_state;
         calculate_chat_window_position(window_dimensions, chat_config)
     };
 
-    let chat_config = &mut game.config.chat_window_config;
+    let chat_config = &mut state.chat_window_state;
     chat_config.pos = chat_pos;
 }
 
-fn run_game<'a>(ui: &Ui<'a>, game: &mut Game) {
-    show_main_menu(ui, &mut game.state);
+fn run_game<'a>(ui: &Ui<'a>, state: &mut State) {
+    show_main_menu(ui, state);
 
-    set_chat_window_pos(game);
-    let chat_config = &game.config.chat_window_config;
-    show_chat_window(ui, &chat_config, &mut game.state)
+    set_chat_window_pos(state);
+    show_chat_window(ui, state)
 }
