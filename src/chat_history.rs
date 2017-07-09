@@ -1,15 +1,3 @@
-use ImStr;
-
-pub struct ChatWindowConfig {
-    pub dimensions: (f32, f32),
-    pub offset: (f32, f32),
-    pub button_padding: f32,
-    pub window_rounding: f32,
-    pub max_length_input_text: usize,
-    pub pos: (f32, f32),
-    pub channels: [(&'static ImStr, (f32, f32, f32, f32)); 5]
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ChannelId(usize);
 
@@ -65,42 +53,60 @@ pub struct ChatHistory {
 }
 
 impl ChatHistory {
-    pub fn new() -> ChatHistory {
-        const CHAT_HISTORY_TEXT: &'static [(&'static str, ChannelId)] = &[
-            ("Wizz: Hey\0", ChannelId(0)),
-            ("Thorny: Yo\0", ChannelId(0)),
-            ("Mufk: SUp man\0", ChannelId(0)),
-            ("Kazaghual: anyone w2b this axe I just found?\0", ChannelId(2)),
-            ("PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the dragon ok? NO FUCK YOU\0", ChannelId(2)),
-            ("Moo:grass plz\0", ChannelId(3)),
-            ("Aladin: STFU Jafar\0", ChannelId(4)),
-            ("Rocky: JKSLFJS\0", ChannelId(5)),
+    fn channel_present(&self, id: ChannelId) -> bool {
+        self.channels.iter().any(|ref x| {x.id == id})
+    }
 
-            ("You took 31 damage.\0", ChannelId(1)),
-            ("You've given 25 damage.\0", ChannelId(1)),
-            ("You took 61 damage.\0", ChannelId(1)),
-            ("You've given 20 damage.\0", ChannelId(1)),
-            ];
-
-        let hst_collection: Vec<ChatMessage> = CHAT_HISTORY_TEXT.iter().rev().map(|&(msg, chan_id)| { ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
+    pub fn new<'a>(history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
+        let hst_collection: Vec<ChatMessage> = history.iter().rev().map(|&(msg, chan_id)| { ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
         ChatHistory { history: hst_collection, channels: vec![] }
+    }
+
+    pub fn channel_names(&self) -> Vec<(String, (f32, f32, f32, f32))> {
+        let copy_channel_name = |c: &Channel| {
+            (c.name.clone(), c.text_color)
+        };
+        self.channels.iter().map(copy_channel_name).collect()
     }
 
     pub fn iter<'a>(&'a self) -> ChatHistoryIterator<'a> {
         ChatHistoryIterator::new(&self.history)
     }
 
-    pub fn lookup_channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channels.iter().filter(|&x| {x.id == id}).next()
+    fn lookup_channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
+        self.channels.iter_mut().filter(|x| {x.id == id}).next()
     }
 
+    pub fn lookup_channel(&self, id: ChannelId) -> Option<&Channel> {
+        self.channels.iter().filter(|x| {x.id == id}).next()
+    }
     pub fn add_channel(&mut self, id: ChannelId, name: &str, text_color: (f32, f32, f32, f32)) -> bool {
-        let channel_already_present = self.channels.iter().any(|ref x| {x.id == id});
+        let channel_already_present = self.channel_present(id);
         if !channel_already_present {
             // We don't add the channel if it's already present.
             self.channels.push(Channel::new(id, name, text_color));
         }
         channel_already_present
+    }
+
+    pub fn rename_channel(&mut self, id: ChannelId, name: &str) -> bool {
+        if !self.channel_present(id) {
+            // can't rename a channel that is not present.
+            return false;
+        }
+        let x = {
+            let x = self.lookup_channel_mut(id).and_then(|f| {
+                println!("renaming {} to {}", f.name, name);
+                f.name = String::from(name);
+                Some(f)
+            });
+
+            match x {
+                Some(_) => true,
+                None => false
+            }
+        };
+        x
     }
 }
 
