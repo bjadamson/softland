@@ -9,12 +9,14 @@ use imgui::*;
 use itertools::Itertools;
 
 use chat_history::{ChannelId, ChatHistory};
+use chat_window::ChatWindowConfig;
 use self::support::Support;
 
 mod chat_history;
+mod chat_window;
 mod support;
 
-const CLEAR_COLOR: (f32, f32, f32, f32) = (0.4, 0.7, 0.8, 0.89);
+const CLEAR_COLOR: (f32, f32, f32, f32) = (0.2, 0.7, 0.8, 0.89);
 
 struct GameConfig {
     window_dimensions: (u32, u32),
@@ -26,16 +28,6 @@ enum EditingFieldOption {
     EditChatHistoryMaximumLength(i32),
     EditChannelName(String),
     EditChannelColorText((f32, f32, f32, f32)),
-}
-
-pub struct ChatWindowConfig {
-    pub dimensions: (f32, f32),
-    pub offset: (f32, f32),
-    pub button_padding: f32,
-    pub window_rounding: f32,
-    pub max_length_chat_input_text: usize,
-    pub max_length_menu_input_text: usize,
-    pub pos: (f32, f32),
 }
 
 struct State {
@@ -82,14 +74,6 @@ fn main() {
             ("You took 61 damage.", ChannelId::new(1)),
             ("You've given 20 damage.", ChannelId::new(1)),
         ];
-    let mut state = State {
-        chat_input_buffer: ImString::with_capacity(chat_buffer_capacity),
-        menu_input_buffer: ImString::with_capacity(menu_input_buffer_capacity),
-        chat_history: ChatHistory::new(chat_history_text),
-        chat_button_pressed: ChannelId::new(0),
-        editing_field: EditingFieldOption::NotEditing
-        };
-
     let init_channels = vec![
         (String::from("General"), (1.0, 1.0, 1.0, 1.0)),
         (String::from("Combat Log"), (1.0, 1.0, 1.0, 1.0)),
@@ -97,11 +81,13 @@ fn main() {
         (String::from("Group"), (0.2, 0.4, 0.9, 1.0)),
         (String::from("Guild"), (0.1, 0.8, 0.3, 1.0)),
     ];
-    for (idx, channels) in init_channels.iter().enumerate() {
-        let &(ref name, (r, g, b, a)) = channels;
-        let id = ChannelId::new(idx);
-        state.chat_history.add_channel(id, &name, (r, g, b, a));
-    }
+    let state = State {
+        chat_input_buffer: ImString::with_capacity(chat_buffer_capacity),
+        menu_input_buffer: ImString::with_capacity(menu_input_buffer_capacity),
+        chat_history: ChatHistory::from_existing(&init_channels, chat_history_text),
+        chat_button_pressed: ChannelId::new(0),
+        editing_field: EditingFieldOption::NotEditing
+        };
 
     let mut game = Game { config: config, state: state };
     let mut support = Support::init(game.config.window_dimensions);

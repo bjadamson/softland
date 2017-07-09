@@ -53,13 +53,20 @@ pub struct ChatHistory {
 }
 
 impl ChatHistory {
-    fn channel_present(&self, id: ChannelId) -> bool {
-        self.channels.iter().any(|ref x| {x.id == id})
+    pub fn new<'a>() -> ChatHistory {
+        ChatHistory { history: vec![], channels: vec![] }
     }
 
-    pub fn new<'a>(history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
-        let hst_collection: Vec<ChatMessage> = history.iter().rev().map(|&(msg, chan_id)| { ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
-        ChatHistory { history: hst_collection, channels: vec![] }
+    pub fn from_existing<'a>(channels: &[((String), (f32, f32, f32, f32))], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
+        let mut chat_history = ChatHistory::new();
+        chat_history.history = history.iter().rev().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
+
+        for (idx, channels) in channels.iter().enumerate() {
+            let &(ref name, (r, g, b, a)) = channels;
+            let id = ChannelId::new(idx);
+            chat_history.add_channel(id, &name, (r, g, b, a));
+        }
+        chat_history
     }
 
     pub fn channel_names(&self) -> Vec<(String, (f32, f32, f32, f32))> {
@@ -89,24 +96,15 @@ impl ChatHistory {
         channel_already_present
     }
 
-    pub fn rename_channel(&mut self, id: ChannelId, name: &str) -> bool {
-        if !self.channel_present(id) {
-            // can't rename a channel that is not present.
-            return false;
-        }
-        let x = {
-            let x = self.lookup_channel_mut(id).and_then(|f| {
-                println!("renaming {} to {}", f.name, name);
-                f.name = String::from(name);
-                Some(f)
-            });
+    fn channel_present(&self, id: ChannelId) -> bool {
+        self.channels.iter().any(|ref x| {x.id == id})
+    }
 
-            match x {
-                Some(_) => true,
-                None => false
-            }
-        };
-        x
+    pub fn rename_channel(&mut self, id: ChannelId, name: &str) -> bool {
+        self.lookup_channel_mut(id).and_then(|f| {
+            f.name = String::from(name);
+            Some(f)
+        }).is_some()
     }
 }
 
