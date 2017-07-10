@@ -2,8 +2,11 @@
 extern crate imgui;
 extern crate itertools;
 
-extern crate glium;
-extern crate imgui_glium_renderer;
+#[macro_use]
+extern crate gfx;
+extern crate gfx_window_glutin;
+extern crate glutin;
+extern crate imgui_gfx_renderer;
 
 #[macro_use]
 extern crate min_max_macros;
@@ -13,14 +16,14 @@ use itertools::Itertools;
 
 use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, State, UiBuffers};
-use self::support::Support;
+//use self::support_gfx::Support;
 
 mod chat_history;
 mod state;
-mod support;
+mod support_gfx;
 mod ui;
 
-const CLEAR_COLOR: (f32, f32, f32, f32) = (0.2, 0.7, 0.8, 0.89);
+const CLEAR_COLOR: [f32; 4] = [0.2, 0.7, 0.8, 0.89];
 
 fn main() {
     let chat_config = ChatWindowState {
@@ -91,13 +94,17 @@ fn main() {
         quit: false,
         };
 
-    let mut support = Support::init(state.window_dimensions);
+    //let mut support = Support::init(state.window_dimensions);
 
     loop {
-        support.render(CLEAR_COLOR, &mut state, ui::render_ui);
-        let active = support.update_events();
-        if !active || state.quit {
+        //support.render(CLEAR_COLOR, &mut state, ui::render_ui);
+        //let active = support.update_events();
+        //if !active || state.quit {
+        support_gfx::run("title", CLEAR_COLOR, &mut state, ui::render_ui);
+        if state.quit {
             break;
         }
+            //break;
+        //}
     }
 }

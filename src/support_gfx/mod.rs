@@ -1,5 +1,6 @@
 use gfx;
 use gfx::Device;
+use gfx::traits::FactoryExt;
 use gfx_window_glutin;
 use glutin;
 use glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode, TouchPhase, WindowEvent};
@@ -7,8 +8,28 @@ use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
-type ColorFormat = gfx::format::Rgba8;
-type DepthFormat = gfx::format::DepthStencil;
+use state::State;
+
+pub type ColorFormat = gfx::format::Rgba8;
+pub type DepthFormat = gfx::format::DepthStencil;
+
+gfx_defines!{
+    vertex Vertex {
+        pos: [f32; 2] = "a_Pos",
+        color: [f32; 3] = "a_Color",
+    }
+
+    pipeline pipe {
+        vbuf: gfx::VertexBuffer<Vertex> = (),
+        out: gfx::RenderTarget<ColorFormat> = "Target0",
+    }
+}
+
+const TRIANGLE: [Vertex; 3] = [
+    Vertex { pos: [ -0.25, -0.25 ], color: [1.0, 0.0, 0.0] },
+    Vertex { pos: [  0.25, -0.25 ], color: [0.0, 1.0, 0.0] },
+    Vertex { pos: [  0.0,  0.25 ], color: [0.0, 0.0, 1.0] }
+];
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 struct MouseState {
@@ -17,7 +38,7 @@ struct MouseState {
     wheel: f32
 }
 
-pub fn run<F: FnMut(&mut f32, &Ui)>(title: &str, clear_color: [f32; 4], model: &mut f32, mut run_ui: F) {
+pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut run_ui: F) {
     let mut imgui = ImGui::init();
 
     let events_loop = glutin::EventsLoop::new();
@@ -35,7 +56,6 @@ pub fn run<F: FnMut(&mut f32, &Ui)>(title: &str, clear_color: [f32; 4], model: &
 
     let mut last_frame = Instant::now();
     let mut mouse_state = MouseState::default();
-    let mut quit = false;
 
     loop {
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
@@ -44,7 +64,7 @@ pub fn run<F: FnMut(&mut f32, &Ui)>(title: &str, clear_color: [f32; 4], model: &
                     gfx_window_glutin::update_views(&window, &mut main_color, &mut main_depth);
                     renderer.update_render_target(main_color.clone());
                 }
-                WindowEvent::Closed => quit = true,
+                WindowEvent::Closed => game.quit = true,
                 WindowEvent::KeyboardInput(state, _, code, _) => {
                     let pressed = state == ElementState::Pressed;
                     match code {
@@ -60,7 +80,7 @@ pub fn run<F: FnMut(&mut f32, &Ui)>(title: &str, clear_color: [f32; 4], model: &
                         Some(VirtualKeyCode::Delete) => imgui.set_key(9, pressed),
                         Some(VirtualKeyCode::Back) => imgui.set_key(10, pressed),
                         Some(VirtualKeyCode::Return) => imgui.set_key(11, pressed),
-                        Some(VirtualKeyCode::Escape) => quit = true,
+                        Some(VirtualKeyCode::Escape) => game.quit = true,
                         Some(VirtualKeyCode::A) => imgui.set_key(13, pressed),
                         Some(VirtualKeyCode::C) => imgui.set_key(14, pressed),
                         Some(VirtualKeyCode::V) => imgui.set_key(15, pressed),
@@ -111,17 +131,27 @@ pub fn run<F: FnMut(&mut f32, &Ui)>(title: &str, clear_color: [f32; 4], model: &
 
         let ui = imgui.frame(size_points, size_pixels, delta_s);
 
-        run_ui(model, &ui);
 
+        let pso = factory.create_pipeline_simple(
+            include_bytes!("../shader/triangle_150.glslv"),
+            include_bytes!("../shader/triangle_150.glslf"),
+            pipe::new()
+        ).unwrap();
+        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&TRIANGLE, ());
+        let data = pipe::Data {
+            vbuf: vertex_buffer,
+            out: main_color.clone()
+        };
+
+        run_ui(&ui, game);
         encoder.clear(&mut main_color, clear_color);
-
-        renderer.render(ui, &mut factory, &mut encoder)
-            .expect("Rendering failed");
+        encoder.draw(&slice, &pso, &data);
+        renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
 
-        if quit { break }
+        if game.quit { break }
     };
 }
 
