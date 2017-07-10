@@ -15,3 +15,5 @@ glutin = "0.8"
 
 imgui-gfx-renderer = { version = "0.0.15-pre", path = "../overrides/imgui-rs/imgui-gfx-renderer" }
 imgui-glium-renderer = { version = "0.0.15-pre", path = "../overrides/imgui-rs/imgui-glium-renderer" }
+
+min_max_macros = "0.1.1"

@@ -45,19 +45,26 @@ impl Iterator for ChatMessage {
     }
 }
 
+pub struct ChatPrune {
+    pub length: i32,
+    pub enabled: bool
+}
+
 pub struct ChatHistory {
     history: Vec<ChatMessage>,
     history_backup: Vec<ChatMessage>,
-    channels: Vec<Channel>
+    channels: Vec<Channel>,
+    prune: ChatPrune
 }
 
 impl ChatHistory {
     pub fn new<'a>() -> ChatHistory {
-        ChatHistory { history: vec![], history_backup: vec![], channels: vec![] }
+        ChatHistory { history: vec![], history_backup: vec![], channels: vec![], prune: ChatPrune { length: 0, enabled: false } }
     }
 
-    pub fn from_existing<'a>(channels: &[((String), [f32; 4])], history: &'a [(&'a str, ChannelId)]) -> ChatHistory {
+    pub fn from_existing<'a>(channels: &[((String), [f32; 4])], history: &'a [(&'a str, ChannelId)], prune: ChatPrune) -> ChatHistory {
         let mut chat_history = ChatHistory::new();
+        chat_history.prune = prune;
         chat_history.history = history.iter().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
 
         for (idx, channels) in channels.iter().enumerate() {
@@ -65,6 +72,7 @@ impl ChatHistory {
             let id = ChannelId::new(idx);
             chat_history.add_channel(id, &name, color);
         }
+        chat_history.send_message_str(ChannelId::new(2), "dev: hi");
         chat_history
     }
 
@@ -115,14 +123,35 @@ impl ChatHistory {
         }).is_some()
     }
 
+    pub fn prune(&mut self) {
+        let length = self.prune.length as usize;
+        let history_length = self.history.len();
+        if length < history_length {
+            let extend_length = history_length - length;
+            self.history_backup.extend(self.history.drain(..extend_length));
+        }
+    }
+
+    pub fn get_prune(&self) -> &ChatPrune {
+        &self.prune
+    }
+
+    pub fn set_prune(&mut self, enabled: bool, length: i32) {
+        self.prune.enabled = enabled;
+        self.prune.length = length;
+    }
+
     pub fn send_message_u8(&mut self, id: ChannelId, msg: &[u8]) {
         let msg = ChatMessage::new(msg.to_owned(), id);
         self.history.push(msg);
+        if self.prune.enabled {
+            self.prune();
+        }
     }
 
-    ///pub fn send_message_str(&mut self, id: ChannelId, msg: &str) {
-    ///    self.send_message_u8(id, msg.as_bytes())
-    ///}
+    pub fn send_message_str(&mut self, id: ChannelId, msg: &str) {
+        self.send_message_u8(id, msg.as_bytes())
+    }
 
     pub fn iter<'a>(&'a self) -> ChatHistoryIterator<'a> {
         ChatHistoryIterator::new(&self.history)

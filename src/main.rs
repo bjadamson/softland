@@ -8,7 +8,10 @@ extern crate imgui_glium_renderer;
 use imgui::*;
 use itertools::Itertools;
 
-use chat_history::{ChannelId, ChatHistory};
+#[macro_use]
+extern crate min_max_macros;
+
+use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use self::support::Support;
 
 mod chat_history;
@@ -32,7 +35,7 @@ pub struct ChatWindowState {
 #[derive(Clone, Debug)]
 enum EditingFieldOption {
     NotEditing,
-    EditChatHistoryMaximumLength(i32),
+    EditChatHistoryMaximumLength(),
     EditChannelName(ChannelId, String),
     EditChannelColorText(ChannelId),
 }
@@ -40,6 +43,10 @@ enum EditingFieldOption {
 struct State {
     chat_input_buffer: ImString,
     menu_input_buffer: ImString,
+    menu_int_buffer: i32,
+    menu_int_buffer_backup: i32,
+    menu_bool_buffer: bool,
+    menu_bool_buffer_backup: bool,
     chat_window_state: ChatWindowState,
     chat_history: ChatHistory,
     chat_button_pressed: ChannelId,
@@ -72,11 +79,20 @@ fn main() {
         ("Moo:grass plz", ChannelId::new(3)),
         ("Aladin: STFU Jafar", ChannelId::new(4)),
         ("Rocky: JKSLFJS", ChannelId::new(5)),
-
         ("You took 31 damage.", ChannelId::new(1)),
         ("You've given 25 damage.", ChannelId::new(1)),
         ("You took 61 damage.", ChannelId::new(1)),
         ("You've given 20 damage.", ChannelId::new(1)),
+        ("A gender chalks in the vintage coke. When will the murder pocket a wanted symptom? My attitude observes any nuisance into the laughing constant.
+        Every candidate offers the railway under the beforehand molecule. The rescue buys his wrath underneath the above garble.", ChannelId::new(4)),
+        ("The truth collars the bass into a lower heel. A squashed machinery kisses the abandon. Across its horse swims a sheep. Any umbrella damage rants over a sniff.
+        How can a theorem chalk the frustrating fraud? Should the world wash an incomprehensible curriculum?", ChannelId::new(3)),
+        ("The cap ducks inside the freedom. The mum hammers the apathy above our preserved ozone. Will the peanut nose a review species? His vocabulary beams near the virgin.
+        The short supporter blames the hack fudge. The waffle exacts the bankrupt within an infantile attitude.", ChannelId::new(1)),
+        ("A flesh hazards the sneaking tooth. An analyst steams before an instinct! The muscle expands within each brother! Why can't the indefinite garbage harden? The feasible cider
+        moans in the forest.", ChannelId::new(2)),
+        ("Opposite the initiative scratches an inane plant. Why won't the late school experiment with a crown? The sneak papers a go dinner without a straw. How can an eating guy camp?
+        Around the convinced verdict waffles a scratching shed. The inhabitant escapes before whatever outcry.", ChannelId::new(1))
     ];
     let init_channels = vec![
         (String::from("General"), [1.0, 1.0, 1.0, 1.0]),
@@ -85,10 +101,15 @@ fn main() {
         (String::from("Group"), [0.2, 0.4, 0.9, 1.0]),
         (String::from("Guild"), [0.1, 0.8, 0.3, 1.0]),
     ];
+    let prune = ChatPrune { length: 10, enabled: false };
     let mut state = State {
         chat_input_buffer: ImString::with_capacity(chat_buffer_capacity),
         menu_input_buffer: ImString::with_capacity(menu_input_buffer_capacity),
-        chat_history: ChatHistory::from_existing(&init_channels, chat_history_text),
+        menu_int_buffer: 0,
+        menu_int_buffer_backup: 0,
+        menu_bool_buffer: false,
+        menu_bool_buffer_backup: false,
+        chat_history: ChatHistory::from_existing(&init_channels, chat_history_text, prune),
         chat_button_pressed: ChannelId::new(0),
         chat_window_state: chat_config,
         editing_field: EditingFieldOption::NotEditing,
@@ -156,7 +177,7 @@ fn add_chat_button<'a>(text: &ImStr, button_color: [f32; 4], text_padding: (f32,
 }
 
 fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, id: ChannelId, channel_name: &str, state: &mut State) {    
-    ui.popup(im_str!("Edit Channel Name"), || {
+    ui.popup(im_str!("Channel Name"), || {
         if state.menu_input_buffer.is_empty() {
             state.menu_input_buffer.push_str(channel_name);
         }
@@ -185,7 +206,7 @@ fn create_rename_chat_channel_popup<'a>(ui: &Ui<'a>, id: ChannelId, channel_name
 }
 
 fn create_set_channel_text_color_popup<'a>(ui: &Ui<'a>, id: ChannelId, state: &mut State) {
-    ui.popup(im_str!("Edit Text Color"), || {
+    ui.popup(im_str!("Text Color"), || {
         state.chat_history.lookup_channel_mut(id).and_then(|mut channel| {
             {
                 ui.text_colored((0.4, 0.4, 0.4, 1.0), im_str!("Edit text color for channel: "));
@@ -243,6 +264,54 @@ fn create_set_channel_text_color_popup<'a>(ui: &Ui<'a>, id: ChannelId, state: &m
     });
 }
 
+fn create_set_maximum_chat_history_popup<'a>(ui: &Ui<'a>, state: &mut State) {
+    ui.popup(im_str!("History Length"), || {
+        let color = (0.4, 0.4, 0.4, 1.0);
+        ui.text_colored(color, im_str!("Enter maximum number of lines to display in your chat window. "));
+        ui.text_colored(color, im_str!("A value of zero will be treated as infinite (until you run out of physical storage)."));
+
+        ui.checkbox(im_str!("Enabled"), &mut state.menu_bool_buffer);
+        ui.with_color_var(ImGuiCol::Text, (0.0, 0.0, 1.0, 0.7), || {
+            ui.input_int(im_str!(""), &mut state.menu_int_buffer)
+                .chars_decimal(true)
+                .enter_returns_true(false)
+                .auto_select_all(true)
+                .build();
+        });
+
+        let button_size = (100.0, 20.0);
+        let cancel_pressed = ui.button(im_str!("Cancel"), button_size);
+        ui.same_line_spacing(0.0, 15.0);
+        let ok_pressed = ui.button(im_str!("Ok"), button_size);
+        if ok_pressed {
+            // Copy value from our buffer.
+            let prune_length = state.menu_int_buffer;
+            state.menu_int_buffer_backup = prune_length;
+
+            let prune_enabled = state.menu_bool_buffer;
+            state.menu_bool_buffer_backup = prune_enabled;
+
+            state.chat_history.set_prune(prune_enabled, prune_length);
+            state.chat_history.restore();
+            if prune_enabled {
+                state.chat_history.prune();
+            }
+        } else if cancel_pressed {
+            // If they pressed cancel, undo our changes.
+            state.menu_int_buffer = state.menu_int_buffer_backup;
+            state.menu_bool_buffer = state.menu_bool_buffer_backup;
+        }
+
+        if cancel_pressed || ok_pressed {
+            state.editing_field = EditingFieldOption::NotEditing;
+            ui.close_current_popup();
+        }
+
+        // restrict values to the positive domain of i32
+        state.menu_int_buffer = max!(0, state.menu_int_buffer);
+    });
+}
+
 fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
@@ -252,7 +321,12 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
             ui.menu_item(im_str!("...")).build();
         });
         ui.menu(im_str!("Chat")).build(|| {
-            ui.menu_item(im_str!("Maximum History")).build();
+            if ui.menu_item(im_str!("Maximum History")).build() {
+                let prune = state.chat_history.get_prune();
+                state.menu_int_buffer_backup = prune.length;
+                state.menu_bool_buffer_backup = prune.enabled;
+                state.editing_field = EditingFieldOption::EditChatHistoryMaximumLength()
+            }
             if ui.menu_item(im_str!("Clear")).build() {
                 state.chat_history.clear();
             }
@@ -281,16 +355,17 @@ fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
     match state.editing_field.clone() {
         EditingFieldOption::EditChannelName(id, name) => {
             create_rename_chat_channel_popup(&ui, id, &name, state);
-            ui.open_popup(im_str!("Edit Channel Name"));
+            ui.open_popup(im_str!("Channel Name"));
         },
         EditingFieldOption::EditChannelColorText(id) => {
             create_set_channel_text_color_popup(&ui, id, state);
-            ui.open_popup(im_str!("Edit Text Color"));
+            ui.open_popup(im_str!("Text Color"));
         },
-        EditingFieldOption::EditChatHistoryMaximumLength(length) => {},
-        EditingFieldOption::NotEditing => {
-            //ui.close_current_popup();
-        }
+        EditingFieldOption::EditChatHistoryMaximumLength() => {
+            create_set_maximum_chat_history_popup(&ui, state);
+            ui.open_popup(im_str!("History Length"));
+        },
+        EditingFieldOption::NotEditing => {}
     };
 }
 
