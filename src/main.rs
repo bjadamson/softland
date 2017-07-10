@@ -94,17 +94,10 @@ fn main() {
         quit: false,
         };
 
-    //let mut support = Support::init(state.window_dimensions);
-
     loop {
-        //support.render(CLEAR_COLOR, &mut state, ui::render_ui);
-        //let active = support.update_events();
-        //if !active || state.quit {
         support_gfx::run("title", CLEAR_COLOR, &mut state, ui::render_ui);
         if state.quit {
             break;
         }
-            //break;
-        //}
     }
 }
