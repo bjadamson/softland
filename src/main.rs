@@ -15,8 +15,6 @@ use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, State, UiBuffers};
 use self::support::Support;
 
-use ui::run_game;
-
 mod chat_history;
 mod state;
 mod support;
@@ -96,7 +94,7 @@ fn main() {
     let mut support = Support::init(state.window_dimensions);
 
     loop {
-        support.render(CLEAR_COLOR, &mut state, run_game);
+        support.render(CLEAR_COLOR, &mut state, ui::render_ui);
         let active = support.update_events();
         if !active || state.quit {
             break;

@@ -3,7 +3,7 @@ use imgui::*;
 use chat_history::{ChannelId, ChatHistory};
 use state::*;
 
-pub fn run_game<'a>(ui: &Ui<'a>, state: &mut State) {
+pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
     {
         let chat_history = &mut state.chat_history;
         let chat_window_state = &mut state.chat_window_state;
