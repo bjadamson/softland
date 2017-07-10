@@ -7,7 +7,7 @@ impl ChannelId {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Channel {
     pub id: ChannelId,
     pub name: String,
@@ -20,36 +20,39 @@ impl Channel {
     }
 }
 
+#[derive(Debug)]
 pub struct ChatMessage {
-    pub msg: Vec<u8>,
+    pub data: Vec<u8>,
     pub channel_id: ChannelId
 }
 
 impl ChatMessage {
     pub fn new<B: Into<Vec<u8>>>(bytes: B, channel_id: ChannelId) -> ChatMessage {
-        ChatMessage { msg: bytes.into(), channel_id: channel_id }
+        ChatMessage { data: bytes.into(), channel_id: channel_id }
     }
 
     pub fn to_owned(&self) -> Vec<u8> {
-        self.msg.to_owned()
+        self.data.to_owned()
     }
 }
 
 impl Iterator for ChatMessage {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
-        match self.msg.iter().next() {
+        match self.data.iter().next() {
             Some(b) => Some(*b),
             None => None
         }
     }
 }
 
+#[derive(Debug)]
 pub struct ChatPrune {
     pub length: i32,
     pub enabled: bool
 }
 
+#[derive(Debug)]
 pub struct ChatHistory {
     history: Vec<ChatMessage>,
     history_backup: Vec<ChatMessage>,
@@ -153,8 +156,12 @@ impl ChatHistory {
         self.send_message_u8(id, msg.as_bytes())
     }
 
-    pub fn iter<'a>(&'a self) -> ChatHistoryIterator<'a> {
+    pub fn iter_history<'a>(&'a self) -> ChatHistoryIterator<'a> {
         ChatHistoryIterator::new(&self.history)
+    }
+
+    pub fn iter_backup<'a>(&'a self) -> ChatHistoryIterator<'a> {
+        ChatHistoryIterator::new(&self.history_backup)
     }
 }
 
