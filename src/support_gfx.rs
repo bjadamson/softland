@@ -38,13 +38,77 @@ struct MouseState {
     wheel: f32
 }
 
+macro_rules! process_event {
+    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse_state:ident, $game:ident, $main_color:ident, $main_depth:ident) => (
+        match $event {
+            WindowEvent::Resized(_, _) => {
+                gfx_window_glutin::update_views(&$window, &mut $main_color, &mut $main_depth);
+                $renderer.update_render_target($main_color.clone());
+            }
+            WindowEvent::Closed => $game.quit = true,
+            WindowEvent::KeyboardInput(state, _, code, _) => {
+                let pressed = state == ElementState::Pressed;
+                match code {
+                    Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
+                    Some(VirtualKeyCode::Left) => $imgui.set_key(1, pressed),
+                    Some(VirtualKeyCode::Right) => $imgui.set_key(2, pressed),
+                    Some(VirtualKeyCode::Up) => $imgui.set_key(3, pressed),
+                    Some(VirtualKeyCode::Down) => $imgui.set_key(4, pressed),
+                    Some(VirtualKeyCode::PageUp) => $imgui.set_key(5, pressed),
+                    Some(VirtualKeyCode::PageDown) => $imgui.set_key(6, pressed),
+                    Some(VirtualKeyCode::Home) => $imgui.set_key(7, pressed),
+                    Some(VirtualKeyCode::End) => $imgui.set_key(8, pressed),
+                    Some(VirtualKeyCode::Delete) => $imgui.set_key(9, pressed),
+                    Some(VirtualKeyCode::Back) => $imgui.set_key(10, pressed),
+                    Some(VirtualKeyCode::Return) => $imgui.set_key(11, pressed),
+                    Some(VirtualKeyCode::Escape) => $game.quit = true,
+                    Some(VirtualKeyCode::A) => $imgui.set_key(13, pressed),
+                    Some(VirtualKeyCode::C) => $imgui.set_key(14, pressed),
+                    Some(VirtualKeyCode::V) => $imgui.set_key(15, pressed),
+                    Some(VirtualKeyCode::X) => $imgui.set_key(16, pressed),
+                    Some(VirtualKeyCode::Y) => $imgui.set_key(17, pressed),
+                    Some(VirtualKeyCode::Z) => $imgui.set_key(18, pressed),
+                    Some(VirtualKeyCode::LControl) |
+                    Some(VirtualKeyCode::RControl) => $imgui.set_key_ctrl(pressed),
+                    Some(VirtualKeyCode::LShift) |
+                    Some(VirtualKeyCode::RShift) => $imgui.set_key_shift(pressed),
+                    Some(VirtualKeyCode::LAlt) |
+                    Some(VirtualKeyCode::RAlt) => $imgui.set_key_alt(pressed),
+                    Some(VirtualKeyCode::LWin) |
+                    Some(VirtualKeyCode::RWin) => $imgui.set_key_super(pressed),
+                    _ => {}
+                }
+            }
+            WindowEvent::MouseMoved(x, y) => $mouse_state.pos = (x, y),
+            WindowEvent::MouseInput(state, MouseButton::Left) => {
+                $mouse_state.pressed.0 = state == ElementState::Pressed
+            }
+            WindowEvent::MouseInput(state, MouseButton::Right) => {
+                $mouse_state.pressed.1 = state == ElementState::Pressed
+            }
+            WindowEvent::MouseInput(state, MouseButton::Middle) => {
+                $mouse_state.pressed.2 = state == ElementState::Pressed
+            }
+            WindowEvent::MouseWheel(MouseScrollDelta::LineDelta(_, y), TouchPhase::Moved) => {
+                $mouse_state.wheel = y
+            }
+            WindowEvent::MouseWheel(MouseScrollDelta::PixelDelta(_, y), TouchPhase::Moved) => {
+                $mouse_state.wheel = y
+            }
+            WindowEvent::ReceivedCharacter(c) => $imgui.add_input_character(c),
+            _ => ()
+        }
+    )
+}
+
 pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut run_ui: F) {
     let mut imgui = ImGui::init();
 
+    let (w, h) = game.window_dimensions;
     let events_loop = glutin::EventsLoop::new();
     let builder = glutin::WindowBuilder::new()
         .with_title(title)
-        .with_dimensions(1024, 768)
+        .with_dimensions(w, h)
         .with_vsync();
     let (window, mut device, mut factory, mut main_color, mut main_depth) =
         gfx_window_glutin::init::<ColorFormat, DepthFormat>(builder, &events_loop);
@@ -59,64 +123,7 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
     loop {
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
-            match event {
-                WindowEvent::Resized(_, _) => {
-                    gfx_window_glutin::update_views(&window, &mut main_color, &mut main_depth);
-                    renderer.update_render_target(main_color.clone());
-                }
-                WindowEvent::Closed => game.quit = true,
-                WindowEvent::KeyboardInput(state, _, code, _) => {
-                    let pressed = state == ElementState::Pressed;
-                    match code {
-                        Some(VirtualKeyCode::Tab) => imgui.set_key(0, pressed),
-                        Some(VirtualKeyCode::Left) => imgui.set_key(1, pressed),
-                        Some(VirtualKeyCode::Right) => imgui.set_key(2, pressed),
-                        Some(VirtualKeyCode::Up) => imgui.set_key(3, pressed),
-                        Some(VirtualKeyCode::Down) => imgui.set_key(4, pressed),
-                        Some(VirtualKeyCode::PageUp) => imgui.set_key(5, pressed),
-                        Some(VirtualKeyCode::PageDown) => imgui.set_key(6, pressed),
-                        Some(VirtualKeyCode::Home) => imgui.set_key(7, pressed),
-                        Some(VirtualKeyCode::End) => imgui.set_key(8, pressed),
-                        Some(VirtualKeyCode::Delete) => imgui.set_key(9, pressed),
-                        Some(VirtualKeyCode::Back) => imgui.set_key(10, pressed),
-                        Some(VirtualKeyCode::Return) => imgui.set_key(11, pressed),
-                        Some(VirtualKeyCode::Escape) => game.quit = true,
-                        Some(VirtualKeyCode::A) => imgui.set_key(13, pressed),
-                        Some(VirtualKeyCode::C) => imgui.set_key(14, pressed),
-                        Some(VirtualKeyCode::V) => imgui.set_key(15, pressed),
-                        Some(VirtualKeyCode::X) => imgui.set_key(16, pressed),
-                        Some(VirtualKeyCode::Y) => imgui.set_key(17, pressed),
-                        Some(VirtualKeyCode::Z) => imgui.set_key(18, pressed),
-                        Some(VirtualKeyCode::LControl) |
-                        Some(VirtualKeyCode::RControl) => imgui.set_key_ctrl(pressed),
-                        Some(VirtualKeyCode::LShift) |
-                        Some(VirtualKeyCode::RShift) => imgui.set_key_shift(pressed),
-                        Some(VirtualKeyCode::LAlt) |
-                        Some(VirtualKeyCode::RAlt) => imgui.set_key_alt(pressed),
-                        Some(VirtualKeyCode::LWin) |
-                        Some(VirtualKeyCode::RWin) => imgui.set_key_super(pressed),
-                        _ => {}
-                    }
-                }
-                WindowEvent::MouseMoved(x, y) => mouse_state.pos = (x, y),
-                WindowEvent::MouseInput(state, MouseButton::Left) => {
-                    mouse_state.pressed.0 = state == ElementState::Pressed
-                }
-                WindowEvent::MouseInput(state, MouseButton::Right) => {
-                    mouse_state.pressed.1 = state == ElementState::Pressed
-                }
-                WindowEvent::MouseInput(state, MouseButton::Middle) => {
-                    mouse_state.pressed.2 = state == ElementState::Pressed
-                }
-                WindowEvent::MouseWheel(MouseScrollDelta::LineDelta(_, y), TouchPhase::Moved) => {
-                    mouse_state.wheel = y
-                }
-                WindowEvent::MouseWheel(MouseScrollDelta::PixelDelta(_, y), TouchPhase::Moved) => {
-                    mouse_state.wheel = y
-                }
-                WindowEvent::ReceivedCharacter(c) => imgui.add_input_character(c),
-                _ => ()
-            }
+            process_event!(event, imgui, window, renderer, mouse_state, game, main_color, main_depth);
         });
 
         let now = Instant::now();
@@ -131,10 +138,9 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
         let ui = imgui.frame(size_points, size_pixels, delta_s);
 
-
         let pso = factory.create_pipeline_simple(
-            include_bytes!("../shader/triangle_150.glslv"),
-            include_bytes!("../shader/triangle_150.glslf"),
+            include_bytes!("shader/triangle_150.glslv"),
+            include_bytes!("shader/triangle_150.glslf"),
             pipe::new()
         ).unwrap();
         let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&TRIANGLE, ());

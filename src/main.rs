@@ -16,7 +16,6 @@ use itertools::Itertools;
 
 use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, State, UiBuffers};
-//use self::support_gfx::Support;
 
 mod chat_history;
 mod state;
@@ -93,11 +92,5 @@ fn main() {
         window_dimensions: (1024, 768),
         quit: false,
         };
-
-    loop {
-        support_gfx::run("title", CLEAR_COLOR, &mut state, ui::render_ui);
-        if state.quit {
-            break;
-        }
-    }
+    support_gfx::run("Softland", CLEAR_COLOR, &mut state, ui::render_ui);
 }
