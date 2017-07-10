@@ -75,7 +75,6 @@ impl ChatHistory {
             let id = ChannelId::new(idx);
             chat_history.add_channel(id, &name, color);
         }
-        chat_history.send_message_str(ChannelId::new(2), "dev: hi");
         chat_history
     }
 
