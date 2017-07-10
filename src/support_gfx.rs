@@ -15,20 +15,32 @@ pub type DepthFormat = gfx::format::DepthStencil;
 
 gfx_defines!{
     vertex Vertex {
-        pos: [f32; 2] = "a_Pos",
-        color: [f32; 3] = "a_Color",
+        pos: [f32; 3] = "a_pos",
+        color: [f32; 4] = "a_color",
     }
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
-        out: gfx::RenderTarget<ColorFormat> = "Target0",
+        out: gfx::RenderTarget<ColorFormat> = "target_0",
     }
 }
 
-const TRIANGLE: [Vertex; 3] = [
-    Vertex { pos: [ -0.25, -0.25 ], color: [1.0, 0.0, 0.0] },
-    Vertex { pos: [  0.25, -0.25 ], color: [0.0, 1.0, 0.0] },
-    Vertex { pos: [  0.0,  0.25 ], color: [0.0, 0.0, 1.0] }
+const SIZE: f32 = 0.25;
+const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
+const GREEN: [f32; 4] = [0.0, 1.0, 0.0, 1.0];
+const BLUE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
+const PURPLE: [f32; 4] = [1.0, 0.0, 1.0, 1.0];
+const YELLOW: [f32; 4] = [1.0, 1.0, 0.0, 1.0];
+const BLUE_GREEN: [f32; 4] = [0.0, 1.0, 1.0, 1.0];
+
+const RECTANGLE: [Vertex; 6] = [
+    Vertex { pos: [ -SIZE, SIZE, 0.0], color: RED },
+    Vertex { pos: [ -SIZE, -SIZE, 0.0 ], color: GREEN },
+    Vertex { pos: [ SIZE, -SIZE, 0.0 ], color: BLUE },
+
+    Vertex { pos: [ SIZE, -SIZE, 0.0], color: BLUE_GREEN },
+    Vertex { pos: [ SIZE, SIZE, 0.0 ], color: YELLOW },
+    Vertex { pos: [ -SIZE, SIZE, 0.0 ], color: PURPLE },
 ];
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
@@ -60,7 +72,13 @@ macro_rules! process_event {
                     Some(VirtualKeyCode::End) => $imgui.set_key(8, pressed),
                     Some(VirtualKeyCode::Delete) => $imgui.set_key(9, pressed),
                     Some(VirtualKeyCode::Back) => $imgui.set_key(10, pressed),
-                    Some(VirtualKeyCode::Return) => $imgui.set_key(11, pressed),
+                    Some(VirtualKeyCode::Return) => {
+                        // 1. Tell imgui the key was pressed.
+                        $imgui.set_key(11, pressed);
+
+                        // 2. Update our state w/regard to chat input.
+                        $game.chat_window_state.user_editing = (state == ElementState::Released);
+                    },
                     Some(VirtualKeyCode::Escape) => $game.quit = true,
                     Some(VirtualKeyCode::A) => $imgui.set_key(13, pressed),
                     Some(VirtualKeyCode::C) => $imgui.set_key(14, pressed),
@@ -101,7 +119,7 @@ macro_rules! process_event {
     )
 }
 
-pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut run_ui: F) {
+pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut render_ui: F) {
     let mut imgui = ImGui::init();
 
     let (w, h) = game.window_dimensions;
@@ -143,16 +161,23 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
             include_bytes!("shader/triangle_150.glslf"),
             pipe::new()
         ).unwrap();
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&TRIANGLE, ());
+
+        let vertex_indices = ();
+        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&RECTANGLE, vertex_indices);
         let data = pipe::Data {
             vbuf: vertex_buffer,
             out: main_color.clone()
         };
 
-        run_ui(&ui, game);
+        // 1) Draw the UI.
         encoder.clear(&mut main_color, clear_color);
+        render_ui(&ui, game);
+
+        // 2) Draw our scene
         encoder.draw(&slice, &pso, &data);
         renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
+
+        // 3) Flush our device and swap the buffers. Cleanup the device too?
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();

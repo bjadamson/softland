@@ -14,6 +14,7 @@ pub struct ChatWindowState {
     pub resizable: bool,
     pub save_settings: bool,
     pub view_all: bool,
+    pub user_editing: bool
 }
 
 #[derive(Debug)]

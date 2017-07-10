@@ -370,21 +370,22 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                     .build(|| {
                         print_chat_messages(&ui, state.chat_button_pressed, &state.chat_history);
                     });
-
-                let chat_entered_by_user = ui.input_text(im_str!(""), &mut state.ui_buffers.chat_input_buffer)
-                    .auto_select_all(true)
-                    .always_insert_mode(true)
-                    .chars_noblank(true)
-                    .enter_returns_true(true)
-                    .build();
-                if chat_entered_by_user {
-                    let prefix = b"You: ";
-                    let mut msg = state.ui_buffers.chat_input_buffer.as_bytes().to_owned();
-                    for (pos, byte) in prefix.iter().enumerate() {
-                        msg.insert(pos, *byte);
+                if state.chat_window_state.user_editing {
+                    let chat_entered_by_user = ui.input_text(im_str!(""), &mut state.ui_buffers.chat_input_buffer)
+                        .auto_select_all(true)
+                        .always_insert_mode(true)
+                        .chars_noblank(true)
+                        .enter_returns_true(true)
+                        .build();
+                    if chat_entered_by_user {
+                        let prefix = b"You: ";
+                        let mut msg = state.ui_buffers.chat_input_buffer.as_bytes().to_owned();
+                        for (pos, byte) in prefix.iter().enumerate() {
+                            msg.insert(pos, *byte);
+                        }
+                        state.chat_history.send_message_u8(state.chat_button_pressed, &msg);
+                        state.ui_buffers.chat_input_buffer.clear();
                     }
-                    state.chat_history.send_message_u8(state.chat_button_pressed, &msg);
-                    state.ui_buffers.chat_input_buffer.clear();
                 }
                 //let mouse_pos = ui.imgui().mouse_pos();
                 //ui.text(im_str!("Mouse Position: ({:.1},{:.1})", mouse_pos.0, mouse_pos.1));

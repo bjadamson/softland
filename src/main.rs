@@ -37,6 +37,7 @@ fn main() {
         resizable: false,
         save_settings: false,
         view_all: false,
+        user_editing: false,
         };
     let chat_buffer_capacity = chat_config.max_length_chat_input_text;
     let menu_input_buffer_capacity = chat_config.max_length_menu_input_text;
