@@ -1,3 +1,5 @@
+extern crate cgmath;
+
 #[macro_use]
 extern crate imgui;
 extern crate itertools;
@@ -7,6 +9,7 @@ extern crate gfx;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate imgui_gfx_renderer;
+extern crate rand;
 
 #[macro_use]
 extern crate min_max_macros;
@@ -18,6 +21,8 @@ use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, State, UiBuffers};
 
 mod chat_history;
+mod color;
+mod gpu;
 mod shape;
 mod state;
 mod support_gfx;

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Benjamin Adamson <adamson.benjamin@gmail.com>"]
 
 [dependencies]
+cgmath = "0.14.1"
 itertools = "0.6.0"
 
 imgui = { version = "0.0.15-pre", path = "../overrides/imgui-rs" }
@@ -13,6 +14,8 @@ gfx_window_glutin = "0.16"
 glium = { version = "0.16", default-features = true }
 glutin = "0.8"
 
+
 imgui-gfx-renderer = { version = "0.0.15-pre", path = "../overrides/imgui-rs/imgui-gfx-renderer" }
 
 min_max_macros = "0.1.1"
+rand = "0.3"

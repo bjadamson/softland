@@ -7,7 +7,11 @@ use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
-use shape;
+extern crate cgmath;
+use cgmath::*;
+
+use color;
+use gpu;
 use state::State;
 
 pub type ColorFormat = gfx::format::Rgba8;
@@ -89,7 +93,7 @@ macro_rules! process_event {
     )
 }
 
-pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut render_ui: F) {
+pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut build_ui: F) {
     let mut imgui = ImGui::init();
 
     let (w, h) = game.window_dimensions;
@@ -108,6 +112,7 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
     let mut last_frame = Instant::now();
     let mut mouse_state = MouseState::default();
+    let mut count = 0;
 
     loop {
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
@@ -123,23 +128,39 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
         let size_points = window.get_inner_size_points().unwrap();
         let size_pixels = window.get_inner_size_pixels().unwrap();
-
         let ui = imgui.frame(size_points, size_pixels, delta_s);
 
-        // 1) Draw the UI.
+        // Draw our scene
+        //
+        // 1. Clear the background.
         encoder.clear(&mut main_color, clear_color);
-        render_ui(&ui, game);
 
-        // 2) Draw our scene
-        let (slice, pso, data) = shape::make_cube(&mut factory, &mut main_color);
-        encoder.draw(&slice, &pso, &data);
+        // 2. Submit geometry to GPU.
+        {
+            let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
 
-        let (slice, pso, data) = shape::make_triangle(&mut factory, &mut main_color);
-        encoder.draw(&slice, &pso, &data);
+            let dimensions = (0.25, 0.25, 0.25);
+            let colors: [[f32; 4]; 8] = [color::RED, color::GREEN, color::BLUE, color::PURPLE, color::YELLOW, color::LIME_GREEN, color::RED, color::GREEN];
 
+            count += 1;
+            let axis = Vector3::new(1.0, 1.0, 0.0).normalize();
+            let rot = Matrix4::from_axis_angle(axis, cgmath::Deg(count as f32));
+
+            //let rot = cgmath::Quaternion::from_angle_x(cgmath::Deg(30.0)).normalized();
+            let model_m = Matrix4::identity() * rot;
+            gpu.send_cube(&dimensions, &colors, model_m);
+
+            let radius = 0.15;
+            gpu.send_triangle(radius);
+        }
+
+        // 3. Construct our UI.   
+        build_ui(&ui, game);
+
+        // 4. Draw our scene (both UI and geometry submitted via encoder).
         renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
 
-        // 3) Flush our device and swap the buffers. Cleanup the device too?
+        // 3) Flush our device and swap the buffers.
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
