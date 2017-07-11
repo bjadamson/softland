@@ -1,5 +1,6 @@
 use imgui::*;
 
+use color;
 use chat_history::{ChannelId, ChatHistory};
 use state::*;
 
@@ -10,7 +11,8 @@ pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
         let ui_buffers = &mut state.ui_buffers;
         let edit_field_option = &mut state.editing_field;
         let quit = &mut state.quit;
-        show_main_menu(ui, quit, chat_window_state, edit_field_option, chat_history, ui_buffers);
+        let framerate = state.framerate;
+        show_main_menu(ui, quit, framerate, chat_window_state, edit_field_option, chat_history, ui_buffers);
     }
     set_chat_window_pos(state);
     show_chat_window(ui, state);
@@ -275,7 +277,7 @@ fn create_view_all_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut Editing
             });
 }
 
-fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, chat_window_state: &mut ChatWindowState, edit_field_option: &mut EditingFieldOption,
+fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, framerate: f64, chat_window_state: &mut ChatWindowState, edit_field_option: &mut EditingFieldOption,
         chat_history: &mut ChatHistory, ui_buffers: &mut UiBuffers)
 {
     ui.main_menu_bar(|| {
@@ -319,6 +321,12 @@ fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, chat_window_state: &mut Chat
             ui.menu_item(im_str!("Movable")).selected(&mut chat_window_state.movable).build();
             ui.menu_item(im_str!("Resizable")).selected(&mut chat_window_state.resizable).build();
             ui.menu_item(im_str!("Save Settings")).selected(&mut chat_window_state.save_settings).build();
+        });
+
+        let fps = "Framerate: ".to_string() + &framerate.to_string();
+        let fps = unsafe { ImString::from_string_unchecked(fps) };
+        ui.with_color_var(ImGuiCol::TextDisabled, color::GREEN_YELLOW, || {
+            ui.menu(&fps).enabled(false).build(|| {});
         });
     });
 }

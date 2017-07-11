@@ -24,8 +24,9 @@ pub struct State {
     pub chat_history: ChatHistory,
     pub chat_button_pressed: ChannelId,
     pub editing_field: EditingFieldOption,
-    pub window_dimensions: (u32, u32),
+    pub framerate: f64,
     pub quit: bool,
+    pub window_dimensions: (u32, u32),
 }
 
 #[derive(Clone, Debug)]

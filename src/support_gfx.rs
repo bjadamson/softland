@@ -11,7 +11,7 @@ use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
 
-use game_time::{GameClock, FrameCounter, FrameCount, FloatDuration};
+use game_time::{GameClock, FrameCounter, FrameCount};
 use game_time::framerate::RunningAverageSampler;
 use game_time::step;
 
@@ -132,7 +132,8 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
     loop {
         sim_time = clock.tick(&step::FixedStep::new(&counter));
         counter.tick(&sim_time);
-        println!("Frame #{} at time={:?}, instant={:?}", sim_time.frame_number(), sim_time.total_game_time(), sim_time.instantaneous_frame_rate());
+        game.framerate = sim_time.instantaneous_frame_rate();
+        println!("Frame #{} at time={:?}, instant={:?}", sim_time.frame_number(), sim_time.total_game_time(), game.framerate);
 
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
             process_event!(event, imgui, window, renderer, mouse_state, game, main_color, main_depth);
