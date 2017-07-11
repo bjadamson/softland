@@ -88,7 +88,7 @@ fn make_triangle2d(length: f32, colors: &[[f32; 4]; 3]) -> [Vertex; 3] {
 type SubmitResult<R> = (gfx::Slice<R>, gfx::PipelineState<R, pipe::Meta>, pipe::Data<R>);
 type OutColor<R: gfx::Resources> = gfx::handle::RenderTargetView<R, (gfx::format::R8_G8_B8_A8, gfx::format::Unorm)>;
 
-macro_rules! send_vertices {
+macro_rules! copy_vertices {
     ($factory:ident, $encoder:ident, $out_color:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
         let (vertex_buffer, slice) = $factory.create_vertex_buffer_with_slice(&$vertices, $indices);
         let data = pipe::Data {
@@ -125,24 +125,30 @@ impl<'z, R, F, C> Gpu<'z, R, F, C> where
         Gpu {factory: f, encoder: e, out_color: out_color}
     }
 
-    pub fn send_cube(&mut self, dimensions: &(f32, f32, f32), colors: &[[f32; 4]; 8], model_m: Matrix4<f32>) -> SubmitResult<R>
+    pub fn draw_cube(&mut self, dimensions: &(f32, f32, f32), colors: &[[f32; 4]; 8], model_m: Matrix4<f32>) -> SubmitResult<R>
     {
-        let cube_set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
-        let pso = self.factory.create_pipeline_state(&cube_set, gfx::Primitive::TriangleStrip, gfx::state::Rasterizer::new_fill(),
-            pipe::new()).unwrap();
+        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
+        let primitive = gfx::Primitive::TriangleStrip;
+        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+        let pipe = pipe::new();
+        let pso = self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap();
         let (vertices, indices) = construct_cube(dimensions, &colors);
 
         let factory = &mut self.factory;
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
 
-        send_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
+        copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
     }
             
-    pub fn send_triangle(&mut self, radius: f32) -> SubmitResult<R>
+    pub fn draw_triangle(&mut self, radius: f32, colors: &[[f32; 4]; 3]) -> SubmitResult<R>
     {
-        use color::*;
-        let colors = [BLUE, YELLOW, PURPLE];
+        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
+        let primitive = gfx::Primitive::TriangleList;
+        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+        let pipe = pipe::new();
+        let pso = self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap();
+
         let vertices = make_triangle2d(radius, &colors);
         let indices = ();
 
@@ -151,7 +157,6 @@ impl<'z, R, F, C> Gpu<'z, R, F, C> where
         let out_color = &mut self.out_color;
 
         let model_m = Matrix4::identity();
-        let pso = factory.create_pipeline_simple(SHADER_V, SHADER_F, pipe::new()).unwrap();
-        send_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
+        copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
     }
 }

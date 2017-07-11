@@ -140,18 +140,18 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
             let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
 
             let dimensions = (0.25, 0.25, 0.25);
-            let colors: [[f32; 4]; 8] = [color::RED, color::GREEN, color::BLUE, color::PURPLE, color::YELLOW, color::LIME_GREEN, color::RED, color::GREEN];
+            let rect_colors: [[f32; 4]; 8] = [color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW];
 
             count += 1;
             let axis = Vector3::new(1.0, 1.0, 0.0).normalize();
             let rot = Matrix4::from_axis_angle(axis, cgmath::Deg(count as f32));
 
-            //let rot = cgmath::Quaternion::from_angle_x(cgmath::Deg(30.0)).normalized();
             let model_m = Matrix4::identity() * rot;
-            gpu.send_cube(&dimensions, &colors, model_m);
+            gpu.draw_cube(&dimensions, &rect_colors, model_m);
 
+            let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
-            gpu.send_triangle(radius);
+            gpu.draw_triangle(radius, &colors);
         }
 
         // 3. Construct our UI.   
