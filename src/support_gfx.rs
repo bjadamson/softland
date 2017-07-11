@@ -1,6 +1,5 @@
 use gfx;
 use gfx::Device;
-use gfx::traits::FactoryExt;
 use gfx_window_glutin;
 use glutin;
 use glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode, TouchPhase, WindowEvent};
@@ -8,22 +7,11 @@ use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
+use shape;
 use state::State;
 
 pub type ColorFormat = gfx::format::Rgba8;
 pub type DepthFormat = gfx::format::DepthStencil;
-
-gfx_defines!{
-    vertex Vertex {
-        pos: [f32; 4] = "a_pos",
-        color: [f32; 4] = "a_color",
-    }
-
-    pipeline pipe {
-        vbuf: gfx::VertexBuffer<Vertex> = (),
-        out: gfx::RenderTarget<ColorFormat> = "target_0",
-    }
-}
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 struct MouseState {
@@ -101,75 +89,6 @@ macro_rules! process_event {
     )
 }
 
-fn calculate_cube_vertices(dimensions: (f32, f32, f32)) -> [[f32; 4]; 8] {
-    let (w, h, l) = dimensions;
-
-    [[-w, -h, l,  1.0], // front bottom-left
-    [w,   -h, l,  1.0], // front bottom-right
-    [w,   h, l,   1.0], // front top-right
-    [-w,  h, l,   1.0], // front top-left
-
-    [-w,  -h, -l, 1.0], // back bottom-left
-    [w,   -h, -l, 1.0], // back bottom-right
-    [w,   h, -l,  1.0], // back top-right
-    [-w,  h,  -l, 1.0]] // back top-left
-}
-
-fn make_triangle2d(length: f32, colors: &[[f32; 4]; 3]) -> [Vertex; 3] {
-    let vertices = [[-length, -length, 0.0, 1.0], [length, -length, 0.0, 1.0], [0.0, length, 0.0, 1.0]];
-    let a = Vertex {
-        pos: [vertices[0][0], vertices[0][1], vertices[0][2], vertices[0][3]],
-        color: colors[0]
-    };
-    let b = Vertex {
-        pos: [vertices[1][0], vertices[1][1], vertices[1][2], vertices[1][3]],
-        color: colors[1]
-    };
-    let c = Vertex {
-        pos: [vertices[2][0], vertices[2][1], vertices[2][2], vertices[2][3]],
-        color: colors[2]
-    };
-    [a, b, c]
-}
-
-fn make_cube(dimensions: (f32, f32, f32), colors: &[[f32; 4]; 8]) -> ([Vertex; 8], &[u16]) {
-    let vertices = calculate_cube_vertices(dimensions);
-    let a = Vertex {
-        pos: [vertices[2][0], vertices[2][1], vertices[2][2], vertices[2][3]],
-        color: colors[0]
-    };
-    let b = Vertex {
-        pos: [vertices[3][0], vertices[3][1], vertices[3][2], vertices[3][3]],
-        color: colors[1]
-    };
-    let c = Vertex {
-        pos: [vertices[6][0], vertices[6][1], vertices[6][2], vertices[6][3]],
-        color: colors[2]
-    };
-    let d = Vertex {
-        pos: [vertices[7][0], vertices[7][1], vertices[7][2], vertices[7][3]],
-        color: colors[3]
-    };
-    let e = Vertex {
-        pos: [vertices[1][0], vertices[1][1], vertices[1][2], vertices[1][3]],
-        color: colors[4]
-    };
-    let f = Vertex {
-        pos: [vertices[0][0], vertices[0][1], vertices[0][2], vertices[0][3]],
-        color: colors[5]
-    };
-    let g = Vertex {
-        pos: [vertices[4][0], vertices[4][1], vertices[4][2], vertices[4][3]],
-        color: colors[6]
-    };
-    let h = Vertex {
-        pos: [vertices[5][0], vertices[5][1], vertices[5][2], vertices[5][3]],
-        color: colors[7]
-    };
-    const INDICES: &[u16] = &[3, 2, 6, 7, 4, 2, 0, 3, 1, 6, 5, 4, 1, 0];
-    ([a, b, c, d, e, f, g, h], &INDICES)
-}
-
 pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut render_ui: F) {
     let mut imgui = ImGui::init();
 
@@ -190,20 +109,6 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
     let mut last_frame = Instant::now();
     let mut mouse_state = MouseState::default();
 
-    const SIZE: f32 = 0.25;
-    const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-    const GREEN: [f32; 4] = [0.0, 1.0, 0.0, 1.0];
-    const BLUE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
-    const PURPLE: [f32; 4] = [1.0, 0.0, 1.0, 1.0];
-    const YELLOW: [f32; 4] = [1.0, 1.0, 0.0, 1.0];
-    const BLUE_GREEN: [f32; 4] = [0.0, 1.0, 1.0, 1.0];
-
-    let CUBE_COLORS: [[f32; 4]; 8] = [RED, GREEN, BLUE, PURPLE, YELLOW, BLUE_GREEN, RED, GREEN];
-    let (cube_vertices, cube_indices) = make_cube((0.25, 0.25, 0.25), &CUBE_COLORS);
-
-    let TRIANGLE_COLORS: [[f32; 4]; 3] = [BLUE, YELLOW, PURPLE];
-    let triangle_vertices = make_triangle2d(0.35, &TRIANGLE_COLORS);
-
     loop {
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
             process_event!(event, imgui, window, renderer, mouse_state, game, main_color, main_depth);
@@ -221,38 +126,17 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
         let ui = imgui.frame(size_points, size_pixels, delta_s);
 
-        let set = factory.create_shader_set(
-            include_bytes!("shader/triangle_150.glslv"),
-            include_bytes!("shader/triangle_150.glslf")
-        ).unwrap();
-
-
         // 1) Draw the UI.
         encoder.clear(&mut main_color, clear_color);
         render_ui(&ui, game);
 
         // 2) Draw our scene
-        let pso = factory.create_pipeline_state(&set, gfx::Primitive::TriangleStrip, gfx::state::Rasterizer::new_fill(), pipe::new()).unwrap();
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&cube_vertices, cube_indices);
-        let data = pipe::Data {
-            vbuf: vertex_buffer,
-            out: main_color.clone()
-        };
+        let (slice, pso, data) = shape::make_cube(&mut factory, &mut main_color);
         encoder.draw(&slice, &pso, &data);
 
-        let pso = factory.create_pipeline_simple(
-            include_bytes!("shader/triangle_150.glslv"),
-            include_bytes!("shader/triangle_150.glslf"),
-            pipe::new()
-        ).unwrap();
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&triangle_vertices, ());
-        let data = pipe::Data {
-            vbuf: vertex_buffer,
-            out: main_color.clone()
-        };
+        let (slice, pso, data) = shape::make_triangle(&mut factory, &mut main_color);
         encoder.draw(&slice, &pso, &data);
 
-        //encoder.draw()
         renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
 
         // 3) Flush our device and swap the buffers. Cleanup the device too?

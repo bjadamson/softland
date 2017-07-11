@@ -18,6 +18,7 @@ use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, State, UiBuffers};
 
 mod chat_history;
+mod shape;
 mod state;
 mod support_gfx;
 mod ui;
