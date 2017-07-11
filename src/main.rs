@@ -4,12 +4,13 @@ extern crate cgmath;
 extern crate imgui;
 extern crate itertools;
 
+extern crate game_time;
+
 #[macro_use]
 extern crate gfx;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate imgui_gfx_renderer;
-extern crate rand;
 
 #[macro_use]
 extern crate min_max_macros;

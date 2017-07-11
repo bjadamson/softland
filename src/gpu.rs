@@ -4,8 +4,7 @@ use gfx;
 use gfx::traits::FactoryExt;
 
 use shape;
-
-pub type ColorFormat = gfx::format::Rgba8;
+use std::marker::PhantomData;
 
 gfx_defines!{
     vertex Vertex {
@@ -15,15 +14,13 @@ gfx_defines!{
 
     constant Locals {
         model: [[f32; 4]; 4] = "u_model",
-        //view: [[f32; 4]; 4] = "u_view",
-        //proj: [[f32; 4]; 4] = "u_proj",
     }
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         locals: gfx::ConstantBuffer<Locals> = "Locals",
         model: gfx::Global<[[f32; 4]; 4]> = "u_model",
-        out: gfx::RenderTarget<ColorFormat> = "target_0",
+        out: gfx::RenderTarget<gfx::format::Rgba8> = "target_0",
     }
 }
 
@@ -85,7 +82,6 @@ fn make_triangle2d(length: f32, colors: &[[f32; 4]; 3]) -> [Vertex; 3] {
     [a, b, c]
 }
 
-type SubmitResult<R> = (gfx::Slice<R>, gfx::PipelineState<R, pipe::Meta>, pipe::Data<R>);
 type OutColor<R: gfx::Resources> = gfx::handle::RenderTargetView<R, (gfx::format::R8_G8_B8_A8, gfx::format::Unorm)>;
 
 macro_rules! copy_vertices {
@@ -102,8 +98,41 @@ macro_rules! copy_vertices {
         };
         $encoder.update_buffer(&data.locals, &[locals], 0).unwrap();
         $encoder.draw(&slice, &$pso, &data);
-        (slice, $pso, data)
     }};
+}
+
+pub struct PsoFactory<'a, R, F> where
+    R: gfx::Resources,
+    F: gfx::Factory<R> + 'a
+{
+    factory: &'a mut F,
+    phantom: PhantomData<R>,
+}
+
+impl<'a, R, F> PsoFactory<'a, R, F> where
+    R: gfx::Resources,
+    F: gfx::Factory<R> + 'a
+{
+    pub fn new(factory: &'a mut F) -> PsoFactory<'a, R, F>
+    {
+        PsoFactory { factory: factory, phantom: PhantomData }
+    }
+
+    pub fn make_triangle_strip_pso(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
+        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
+        let primitive = gfx::Primitive::TriangleStrip;
+        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+        let pipe = pipe::new();
+        self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap()
+    }
+
+    pub fn make_triangle_list_pso(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
+        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
+        let primitive = gfx::Primitive::TriangleList;
+        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+        let pipe = pipe::new();
+        self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap()
+    }
 }
 
 pub struct Gpu<'a, R, F, C> where
@@ -125,13 +154,8 @@ impl<'z, R, F, C> Gpu<'z, R, F, C> where
         Gpu {factory: f, encoder: e, out_color: out_color}
     }
 
-    pub fn draw_cube(&mut self, dimensions: &(f32, f32, f32), colors: &[[f32; 4]; 8], model_m: Matrix4<f32>) -> SubmitResult<R>
+    pub fn draw_cube(&mut self, pso: &gfx::PipelineState<R, pipe::Meta>, dimensions: &(f32, f32, f32), colors: &[[f32; 4]; 8], model_m: Matrix4<f32>)
     {
-        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
-        let primitive = gfx::Primitive::TriangleStrip;
-        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
-        let pipe = pipe::new();
-        let pso = self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap();
         let (vertices, indices) = construct_cube(dimensions, &colors);
 
         let factory = &mut self.factory;
@@ -141,14 +165,8 @@ impl<'z, R, F, C> Gpu<'z, R, F, C> where
         copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
     }
             
-    pub fn draw_triangle(&mut self, radius: f32, colors: &[[f32; 4]; 3]) -> SubmitResult<R>
+    pub fn draw_triangle(&mut self, pso: &gfx::PipelineState<R, pipe::Meta>, radius: f32, colors: &[[f32; 4]; 3], model_m: Matrix4<f32>)
     {
-        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
-        let primitive = gfx::Primitive::TriangleList;
-        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
-        let pipe = pipe::new();
-        let pso = self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap();
-
         let vertices = make_triangle2d(radius, &colors);
         let indices = ();
 
@@ -156,7 +174,6 @@ impl<'z, R, F, C> Gpu<'z, R, F, C> where
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
 
-        let model_m = Matrix4::identity();
         copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
     }
 }

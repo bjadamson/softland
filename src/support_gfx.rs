@@ -1,3 +1,6 @@
+extern crate cgmath;
+use cgmath::*;
+
 use gfx;
 use gfx::Device;
 use gfx_window_glutin;
@@ -7,8 +10,10 @@ use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
-extern crate cgmath;
-use cgmath::*;
+
+use game_time::{GameClock, FrameCounter, FrameCount, FloatDuration};
+use game_time::framerate::RunningAverageSampler;
+use game_time::step;
 
 use color;
 use gpu;
@@ -112,9 +117,23 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
 
     let mut last_frame = Instant::now();
     let mut mouse_state = MouseState::default();
-    let mut count = 0;
+
+    let (triangle_pso, cube_pso) = {
+        let mut pso_factory = gpu::PsoFactory::new(&mut factory);
+        let triangle_pso = pso_factory.make_triangle_list_pso();
+        let cube_pso = pso_factory.make_triangle_strip_pso();
+        (triangle_pso, cube_pso)
+    };
+
+    let mut clock = GameClock::new();
+    let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
+    let mut sim_time;
 
     loop {
+        sim_time = clock.tick(&step::FixedStep::new(&counter));
+        counter.tick(&sim_time);
+        println!("Frame #{} at time={:?}, instant={:?}", sim_time.frame_number(), sim_time.total_game_time(), sim_time.instantaneous_frame_rate());
+
         events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
             process_event!(event, imgui, window, renderer, mouse_state, game, main_color, main_depth);
         });
@@ -125,7 +144,6 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
         last_frame = now;
 
         update_mouse(&mut imgui, &mut mouse_state);
-
         let size_points = window.get_inner_size_points().unwrap();
         let size_pixels = window.get_inner_size_pixels().unwrap();
         let ui = imgui.frame(size_points, size_pixels, delta_s);
@@ -142,16 +160,17 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
             let dimensions = (0.25, 0.25, 0.25);
             let rect_colors: [[f32; 4]; 8] = [color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW];
 
-            count += 1;
-            let axis = Vector3::new(1.0, 1.0, 0.0).normalize();
-            let rot = Matrix4::from_axis_angle(axis, cgmath::Deg(count as f32));
+            let angle = cgmath::Deg(sim_time.frame_number() as f32);
+            let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
 
             let model_m = Matrix4::identity() * rot;
-            gpu.draw_cube(&dimensions, &rect_colors, model_m);
+            gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, model_m);
 
+            let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
+            let model_m = Matrix4::identity() * rot;
             let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
-            gpu.draw_triangle(radius, &colors);
+            gpu.draw_triangle(&triangle_pso, radius, &colors, model_m);
         }
 
         // 3. Construct our UI.   
