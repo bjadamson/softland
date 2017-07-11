@@ -7,7 +7,7 @@ authors = ["Benjamin Adamson <adamson.benjamin@gmail.com>"]
 cgmath = "0.14.1"
 itertools = "0.6.0"
 
-imgui = { version = "0.0.15-pre", path = "../overrides/imgui-rs" }
+imgui = { version = "0.0.15-pre", path = "./external/imgui-rs" }
 game_time = "0.2.0"
 gfx = "0.16"
 gfx_window_glutin = "0.16"
@@ -15,6 +15,6 @@ glium = { version = "0.16", default-features = true }
 glutin = "0.8"
 
 
-imgui-gfx-renderer = { version = "0.0.15-pre", path = "../overrides/imgui-rs/imgui-gfx-renderer" }
+imgui-gfx-renderer = { version = "0.0.15-pre", path = "./external/imgui-rs/imgui-gfx-renderer" }
 
 min_max_macros = "0.1.1"
