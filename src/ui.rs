@@ -114,14 +114,11 @@ fn create_rename_chat_channel<'a>(ui: &Ui<'a>, id: ChannelId, channel_name: &str
             ui.text(&text);
 
             ui.same_line(0.0);
-            chat_history.lookup_channel(id).and_then(|channel| {
+            if let Some(channel) = chat_history.lookup_channel(id) {
                 let text = channel_name.to_owned();
                 let text = unsafe { ImString::from_string_unchecked(text) };
                 ui.text_colored(channel.text_color, &text);
-
-                // not sure about this
-                Some(channel)
-            });
+            };
             text.clear();
             ui.input_text(&text, &mut ui_buffers.menu_input_buffer)
                 .auto_select_all(true)
@@ -162,40 +159,32 @@ fn create_set_channel_text_color<'a>(ui: &Ui<'a>, id: ChannelId, edit_field_opti
         .scroll_bar(false)
         .always_auto_resize(true)
         .build(|| {
-            chat_history
-                .lookup_channel_mut(id)
-                .and_then(|channel| {
-                    let color = (0.4, 0.4, 0.4, 1.0);
-                    ui.text_colored(color, im_str!("Edit text color channel "));
-                    let channel_name = unsafe { ImString::from_string_unchecked(channel.name.clone()) };
-                    ui.text_colored(channel.text_color.clone(), &channel_name);
-                    ui.new_line();
+            if let Some(channel) = chat_history.lookup_channel_mut(id) {
+                let color = (0.4, 0.4, 0.4, 1.0);
+                ui.text_colored(color, im_str!("Edit text color channel "));
+                let channel_name = unsafe { ImString::from_string_unchecked(channel.name.clone()) };
+                ui.text_colored(channel.text_color.clone(), &channel_name);
+                ui.new_line();
 
-                    ui.color_edit4(im_str!(""), &mut ui_buffers.menu_color_buffer).build();
+                ui.color_edit4(im_str!(""), &mut ui_buffers.menu_color_buffer).build();
 
-                    let button_size = (100.0, 20.0);
-                    cancel_pressed = ui.button(im_str!("Cancel"), button_size);
-                    ui.same_line_spacing(0.0, 15.0);
-                    ok_pressed = ui.button(im_str!("Ok"), button_size);
-
-                    // TODO: this may be incorrect..
-                    Some(channel)
-                });
+                let button_size = (100.0, 20.0);
+                cancel_pressed = ui.button(im_str!("Cancel"), button_size);
+                ui.same_line_spacing(0.0, 15.0);
+                ok_pressed = ui.button(im_str!("Ok"), button_size);
+            };
         });
-    chat_history
-        .lookup_channel_mut(id)
-        .and_then(|mut channel| {
-            if ok_pressed {
-                channel.text_color = ui_buffers.menu_color_buffer;
-                ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
-            } else if cancel_pressed {
-                ui_buffers.menu_color_buffer = ui_buffers.menu_color_buffer_backup;
-            }
-            if cancel_pressed || ok_pressed {
-                *edit_field_option = EditingFieldOption::NotEditing;
-            }
-            Some(channel)
-        });
+    if let Some(mut channel) = chat_history.lookup_channel_mut(id) {
+        if ok_pressed {
+            channel.text_color = ui_buffers.menu_color_buffer;
+            ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
+        } else if cancel_pressed {
+            ui_buffers.menu_color_buffer = ui_buffers.menu_color_buffer_backup;
+        }
+        if cancel_pressed || ok_pressed {
+            *edit_field_option = EditingFieldOption::NotEditing;
+        }
+    };
 }
 
 fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut EditingFieldOption, chat_history: &mut ChatHistory, ui_buffers: &mut UiBuffers) {
@@ -299,15 +288,12 @@ fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, framerate: f64, chat_window_
                         *edit_field_option = EditingFieldOption::ChannelName(channel_id, channel_name.to_owned());
                     }
                     if ui.menu_item(im_str!("Color")).build() {
-                        chat_history.lookup_channel_mut(ChannelId::new(idx))
-                            .and_then(|channel| {
-                                ui_buffers.menu_color_buffer = channel.text_color;
-                                // Store the color currently in the buffer for later.
-                                ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
-                                *edit_field_option = EditingFieldOption::ChannelColorText(channel_id);
-
-                                Some(channel)
-                            });
+                        if let Some(channel) = chat_history.lookup_channel_mut(ChannelId::new(idx)) {
+                            ui_buffers.menu_color_buffer = channel.text_color;
+                            // Store the color currently in the buffer for later.
+                            ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
+                            *edit_field_option = EditingFieldOption::ChannelColorText(channel_id);
+                        };
                     }
                     ui.menu_item(im_str!("Font")).build();
                 });

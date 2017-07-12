@@ -1,4 +1,4 @@
-use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
+use cgmath::*;
 
 use gfx;
 use gfx::traits::FactoryExt;
