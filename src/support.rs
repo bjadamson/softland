@@ -219,6 +219,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             let mmatrix = Matrix4::identity() * rot;
             let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
+            let uv_matrix = projection * view * mmatrix;
             gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
         }
 

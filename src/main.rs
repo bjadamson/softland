@@ -36,9 +36,9 @@ mod ui;
 
 const CLEAR_COLOR: [f32; 4] = [0.3, 0.8, 0.6, 0.79];
 
-struct SupportSystem;
+struct MainSystem;
 
-impl<'a> System<'a> for SupportSystem {
+impl<'a> System<'a> for MainSystem {
     type SystemData = FetchMut<'a, State>;
 
     fn run(&mut self, mut data: Self::SystemData) {
@@ -151,6 +151,6 @@ fn main() {
     world.register::<State>();
     world.add_resource(state);
 
-    let mut dispatcher = DispatcherBuilder::new().add_thread_local(SupportSystem).build();
+    let mut dispatcher = DispatcherBuilder::new().add_thread_local(MainSystem).build();
     dispatcher.dispatch(&mut world.res);
 }
