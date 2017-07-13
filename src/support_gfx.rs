@@ -26,7 +26,7 @@ pub type DepthFormat = gfx::format::DepthStencil;
 struct MouseState {
     pos: (i32, i32),
     pressed: (bool, bool, bool),
-    wheel: f32
+    wheel: f32,
 }
 
 macro_rules! process_event {
@@ -39,6 +39,8 @@ macro_rules! process_event {
             WindowEvent::Closed => $game.quit = true,
             WindowEvent::KeyboardInput(state, _, code, _) => {
                 let pressed = state == ElementState::Pressed;
+                let player = &mut $game.player;
+                let camera = &mut player.camera;
                 match code {
                     Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
                     Some(VirtualKeyCode::Left) => $imgui.set_key(1, pressed),
@@ -52,16 +54,29 @@ macro_rules! process_event {
                     Some(VirtualKeyCode::Delete) => $imgui.set_key(9, pressed),
                     Some(VirtualKeyCode::Back) => $imgui.set_key(10, pressed),
                     Some(VirtualKeyCode::Return) => {
-                        // 1. Tell imgui the key was pressed.
+// 1. Tell imgui the key was pressed.
                         $imgui.set_key(11, pressed);
 
-                        // 2. Update our state w/regard to chat input.
+// 2. Update our state w/regard to chat input.
                         $game.chat_window_state.user_editing = state == ElementState::Released;
                     },
                     Some(VirtualKeyCode::Escape) => $game.quit = true,
-                    Some(VirtualKeyCode::A) => $imgui.set_key(13, pressed),
+                    Some(VirtualKeyCode::A) => {
+                        $imgui.set_key(13, pressed);
+
+                        camera.move_left(player.move_speed);
+                    }
                     Some(VirtualKeyCode::C) => $imgui.set_key(14, pressed),
+                    Some(VirtualKeyCode::D) => {
+                        camera.move_right(player.move_speed);
+                    }
+                    Some(VirtualKeyCode::S) => {
+                        camera.move_backward(player.move_speed);
+                    }
                     Some(VirtualKeyCode::V) => $imgui.set_key(15, pressed),
+                    Some(VirtualKeyCode::W) => {
+                        camera.move_forward(player.move_speed);
+                    }
                     Some(VirtualKeyCode::X) => $imgui.set_key(16, pressed),
                     Some(VirtualKeyCode::Y) => $imgui.set_key(17, pressed),
                     Some(VirtualKeyCode::Z) => $imgui.set_key(18, pressed),
@@ -98,7 +113,10 @@ macro_rules! process_event {
     )
 }
 
-pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: &mut State, mut build_ui: F) {
+pub fn run<F: FnMut(&Ui, &mut State)>(title: &str,
+                                      clear_color: [f32; 4],
+                                      game: &mut State,
+                                      mut build_ui: F) {
     let mut imgui = ImGui::init();
 
     let (w, h) = game.window_dimensions;
@@ -133,10 +151,16 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
         sim_time = clock.tick(&step::FixedStep::new(&counter));
         counter.tick(&sim_time);
         game.framerate = sim_time.instantaneous_frame_rate();
-        println!("Frame #{} at time={:?}, instant={:?}", sim_time.frame_number(), sim_time.total_game_time(), game.framerate);
 
-        events_loop.poll_events(|glutin::Event::WindowEvent{event, ..}| {
-            process_event!(event, imgui, window, renderer, mouse_state, game, main_color, main_depth);
+        events_loop.poll_events(|glutin::Event::WindowEvent { event, .. }| {
+            process_event!(event,
+                           imgui,
+                           window,
+                           renderer,
+                           mouse_state,
+                           game,
+                           main_color,
+                           main_depth);
         });
 
         let now = Instant::now();
@@ -159,22 +183,34 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
             let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
 
             let dimensions = (0.25, 0.25, 0.25);
-            let rect_colors: [[f32; 4]; 8] = [color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW, color::RED, color::YELLOW];
+            let rect_colors: [[f32; 4]; 8] = [color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW];
+
+            let projection = Matrix4::identity();
+            let view = game.player.camera.compute_view();
+            // let view = Matrix4::from_diagonal(view);
 
             let angle = cgmath::Deg(sim_time.frame_number() as f32);
             let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
+            let mmatrix = Matrix4::identity() * rot;
+            let uv_matrix = projection * view * mmatrix;
 
-            let model_m = Matrix4::identity() * rot;
-            gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, model_m);
+            gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, uv_matrix);
 
             let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
-            let model_m = Matrix4::identity() * rot;
+            let mmatrix = Matrix4::identity() * rot;
             let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
-            gpu.draw_triangle(&triangle_pso, radius, &colors, model_m);
+            gpu.draw_triangle(&triangle_pso, radius, &colors, mmatrix);
         }
 
-        // 3. Construct our UI.   
+        // 3. Construct our UI.
         build_ui(&ui, game);
 
         // 4. Draw our scene (both UI and geometry submitted via encoder).
@@ -185,8 +221,10 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str, clear_color: [f32; 4], game: 
         window.swap_buffers().unwrap();
         device.cleanup();
 
-        if game.quit { break }
-    };
+        if game.quit {
+            break;
+        }
+    }
 }
 
 fn configure_keys(imgui: &mut ImGui) {
@@ -216,10 +254,10 @@ fn update_mouse(imgui: &mut ImGui, mouse_state: &mut MouseState) {
     imgui.set_mouse_pos(mouse_state.pos.0 as f32 / scale.0,
                         mouse_state.pos.1 as f32 / scale.1);
     imgui.set_mouse_down(&[mouse_state.pressed.0,
-                              mouse_state.pressed.1,
-                              mouse_state.pressed.2,
-                              false,
-                              false]);
+                           mouse_state.pressed.1,
+                           mouse_state.pressed.2,
+                           false,
+                           false]);
     imgui.set_mouse_wheel(mouse_state.wheel / scale.1);
     mouse_state.wheel = 0.0;
 }

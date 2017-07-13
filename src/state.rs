@@ -1,3 +1,4 @@
+use camera::Camera;
 use chat_history::*;
 use imgui::*;
 
@@ -14,7 +15,7 @@ pub struct ChatWindowState {
     pub resizable: bool,
     pub save_settings: bool,
     pub view_all: bool,
-    pub user_editing: bool
+    pub user_editing: bool,
 }
 
 #[derive(Debug)]
@@ -27,6 +28,14 @@ pub struct State {
     pub framerate: f64,
     pub quit: bool,
     pub window_dimensions: (u32, u32),
+
+    pub player: Player,
+}
+
+#[derive(Debug)]
+pub struct Player {
+    pub camera: Camera,
+    pub move_speed: f32,
 }
 
 #[derive(Clone, Debug)]

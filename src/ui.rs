@@ -1,3 +1,4 @@
+use cgmath::*;
 use imgui::*;
 
 use color;
@@ -12,7 +13,15 @@ pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
         let edit_field_option = &mut state.editing_field;
         let quit = &mut state.quit;
         let framerate = state.framerate;
-        show_main_menu(ui, quit, framerate, chat_window_state, edit_field_option, chat_history, ui_buffers);
+        let position = state.player.camera.position();
+        show_main_menu(ui,
+                       quit,
+                       framerate,
+                       position,
+                       chat_window_state,
+                       edit_field_option,
+                       chat_history,
+                       ui_buffers);
     }
     set_chat_window_pos(state);
     show_chat_window(ui, state);
@@ -21,20 +30,20 @@ pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
     let ui_buffers = &mut state.ui_buffers;
     let edit_field_option = &mut state.editing_field;
     match edit_field_option.clone() {
-            EditingFieldOption::ChannelName(id, name) => {
-                create_rename_chat_channel(&ui, id, &name, edit_field_option, chat_history, ui_buffers);
-            },
-            EditingFieldOption::ChannelColorText(id) => {
-                create_set_channel_text_color(&ui, id, edit_field_option, chat_history, ui_buffers);
-            },
-            EditingFieldOption::ChatHistoryMaximumLength => {
-                create_set_maximum_chat_history(&ui, edit_field_option, chat_history, ui_buffers);
-            },
-            EditingFieldOption::ChatHistoryViewAll => {
-                create_view_all_chat_history(&ui, edit_field_option, chat_history);
-            }
-            EditingFieldOption::NotEditing => {}
-        };
+        EditingFieldOption::ChannelName(id, name) => {
+            create_rename_chat_channel(&ui, id, &name, edit_field_option, chat_history, ui_buffers);
+        }
+        EditingFieldOption::ChannelColorText(id) => {
+            create_set_channel_text_color(&ui, id, edit_field_option, chat_history, ui_buffers);
+        }
+        EditingFieldOption::ChatHistoryMaximumLength => {
+            create_set_maximum_chat_history(&ui, edit_field_option, chat_history, ui_buffers);
+        }
+        EditingFieldOption::ChatHistoryViewAll => {
+            create_view_all_chat_history(&ui, edit_field_option, chat_history);
+        }
+        EditingFieldOption::NotEditing => {}
+    };
 }
 
 fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: [f32; 4], msg_bytes: Vec<u8>) {
@@ -47,7 +56,8 @@ fn print_chat_msg<'a>(ui: &Ui<'a>, text_color: [f32; 4], msg_bytes: Vec<u8>) {
 fn print_chat_messages<'a>(ui: &Ui<'a>, channel_id: ChannelId, history: &ChatHistory) {
     // If looking at channel 0, show all results.
     // Otherwise only yield results for the channel.
-    for msg in history.iter_history().filter(|&msg| { channel_id == ChannelId::new(0) || msg.channel_id == channel_id }) {
+    for msg in history.iter_history()
+        .filter(|&msg| channel_id == ChannelId::new(0) || msg.channel_id == channel_id) {
         if let Some(channel) = history.lookup_channel(msg.channel_id) {
             print_chat_msg(&ui, channel.text_color, msg.to_owned());
         }
@@ -67,7 +77,11 @@ fn print_all_chat_message<'a>(ui: &Ui<'a>, history: &ChatHistory) {
     }
 }
 
-fn add_chat_button<'a>(text: &ImStr, button_color: [f32; 4], text_padding: (f32, f32), ui: &Ui<'a>) -> bool {
+fn add_chat_button<'a>(text: &ImStr,
+                       button_color: [f32; 4],
+                       text_padding: (f32, f32),
+                       ui: &Ui<'a>)
+                       -> bool {
     let dont_wrap = -1.0;
     let text_size = ui.calc_text_size(text, false, dont_wrap);
 
@@ -92,9 +106,12 @@ fn add_chat_button<'a>(text: &ImStr, button_color: [f32; 4], text_padding: (f32,
     pressed
 }
 
-fn create_rename_chat_channel<'a>(ui: &Ui<'a>, id: ChannelId, channel_name: &str, edit_field_option: &mut EditingFieldOption,
-    chat_history: &mut ChatHistory, ui_buffers: &mut UiBuffers)
-{
+fn create_rename_chat_channel<'a>(ui: &Ui<'a>,
+                                  id: ChannelId,
+                                  channel_name: &str,
+                                  edit_field_option: &mut EditingFieldOption,
+                                  chat_history: &mut ChatHistory,
+                                  ui_buffers: &mut UiBuffers) {
     ui.window(im_str!("Rename Channel"))
         .position((100.0, 100.0), ImGuiSetCond_FirstUseEver)
         .title_bar(true)
@@ -145,8 +162,11 @@ fn create_rename_chat_channel<'a>(ui: &Ui<'a>, id: ChannelId, channel_name: &str
         });
 }
 
-fn create_set_channel_text_color<'a>(ui: &Ui<'a>, id: ChannelId, edit_field_option: &mut EditingFieldOption, chat_history: &mut ChatHistory,
-    ui_buffers: &mut UiBuffers) {
+fn create_set_channel_text_color<'a>(ui: &Ui<'a>,
+                                     id: ChannelId,
+                                     edit_field_option: &mut EditingFieldOption,
+                                     chat_history: &mut ChatHistory,
+                                     ui_buffers: &mut UiBuffers) {
     let (mut ok_pressed, mut cancel_pressed) = Default::default();
     ui.window(im_str!("Edit Channel Text Color"))
         .position((100.0, 100.0), ImGuiSetCond_FirstUseEver)
@@ -187,7 +207,10 @@ fn create_set_channel_text_color<'a>(ui: &Ui<'a>, id: ChannelId, edit_field_opti
     };
 }
 
-fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut EditingFieldOption, chat_history: &mut ChatHistory, ui_buffers: &mut UiBuffers) {
+fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>,
+                                       edit_field_option: &mut EditingFieldOption,
+                                       chat_history: &mut ChatHistory,
+                                       ui_buffers: &mut UiBuffers) {
     ui.window(im_str!("History Length"))
         .position((100.0, 100.0), ImGuiSetCond_FirstUseEver)
         .title_bar(true)
@@ -243,8 +266,10 @@ fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut Edit
         });
 }
 
-fn create_view_all_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut EditingFieldOption, chat_history: &mut ChatHistory) {
-        ui.window(im_str!("Examine Chat"))
+fn create_view_all_chat_history<'a>(ui: &Ui<'a>,
+                                    edit_field_option: &mut EditingFieldOption,
+                                    chat_history: &mut ChatHistory) {
+    ui.window(im_str!("Examine Chat"))
             .position((100.0, 100.0), ImGuiSetCond_FirstUseEver)
             .size((600.0, 400.0), ImGuiSetCond_FirstUseEver)
             .title_bar(true)
@@ -266,9 +291,14 @@ fn create_view_all_chat_history<'a>(ui: &Ui<'a>, edit_field_option: &mut Editing
             });
 }
 
-fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, framerate: f64, chat_window_state: &mut ChatWindowState, edit_field_option: &mut EditingFieldOption,
-        chat_history: &mut ChatHistory, ui_buffers: &mut UiBuffers)
-{
+fn show_main_menu<'a>(ui: &Ui<'a>,
+                      quit: &mut bool,
+                      framerate: f64,
+                      position: Vector3<f32>,
+                      chat_window_state: &mut ChatWindowState,
+                      edit_field_option: &mut EditingFieldOption,
+                      chat_history: &mut ChatHistory,
+                      ui_buffers: &mut UiBuffers) {
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
             ui.menu_item(im_str!("Exit")).selected(quit).build();
@@ -285,10 +315,12 @@ fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, framerate: f64, chat_window_
                 ui.menu(&cn).build(|| {
                     let channel_id = ChannelId::new(idx);
                     if ui.menu_item(im_str!("Name")).build() {
-                        *edit_field_option = EditingFieldOption::ChannelName(channel_id, channel_name.to_owned());
+                        *edit_field_option =
+                            EditingFieldOption::ChannelName(channel_id, channel_name.to_owned());
                     }
                     if ui.menu_item(im_str!("Color")).build() {
-                        if let Some(channel) = chat_history.lookup_channel_mut(ChannelId::new(idx)) {
+                        if let Some(channel) =
+                               chat_history.lookup_channel_mut(ChannelId::new(idx)) {
                             ui_buffers.menu_color_buffer = channel.text_color;
                             // Store the color currently in the buffer for later.
                             ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
@@ -306,7 +338,14 @@ fn show_main_menu<'a>(ui: &Ui<'a>, quit: &mut bool, framerate: f64, chat_window_
             }
             ui.menu_item(im_str!("Movable")).selected(&mut chat_window_state.movable).build();
             ui.menu_item(im_str!("Resizable")).selected(&mut chat_window_state.resizable).build();
-            ui.menu_item(im_str!("Save Settings")).selected(&mut chat_window_state.save_settings).build();
+            ui.menu_item(im_str!("Save Settings"))
+                .selected(&mut chat_window_state.save_settings)
+                .build();
+        });
+        let pos = format!("Position: [{}, {}, {}]", position.x, position.y, position.z);
+        let pos = unsafe { ImString::from_string_unchecked(pos) };
+        ui.with_color_var(ImGuiCol::TextDisabled, color::BLACK, || {
+            ui.menu(&pos).enabled(false).build(|| {});
         });
 
         let fps = "Framerate: ".to_string() + &framerate.to_string();
@@ -322,7 +361,7 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
     let (chat_w, chat_h) = state.chat_window_state.dimensions;
     let (chat_w, chat_h) = (chat_w as f32, chat_h as f32);
     let window_pos = state.chat_window_state.pos;
-    //let button_height = state.button_padding;
+    // let button_height = state.button_padding;
 
     ui.with_style_var(window_rounding, || {
         ui.window(im_str!("ChatWindow"))
@@ -388,7 +427,9 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
 }
 
 fn set_chat_window_pos<'a>(state: &mut State) {
-    fn calculate_chat_window_position(window_dimensions: (u32, u32), config: &ChatWindowState) -> (f32, f32) {
+    fn calculate_chat_window_position(window_dimensions: (u32, u32),
+                                      config: &ChatWindowState)
+                                      -> (f32, f32) {
         let (_, window_h) = window_dimensions;
         let window_h = window_h as f32;
         let (_, chat_h) = config.dimensions;

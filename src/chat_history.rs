@@ -11,24 +11,31 @@ impl ChannelId {
 pub struct Channel {
     pub id: ChannelId,
     pub name: String,
-    pub text_color: [f32; 4]
+    pub text_color: [f32; 4],
 }
 
 impl Channel {
     pub fn new(id: ChannelId, name: &str, text_color: [f32; 4]) -> Channel {
-        Channel { id: id, name: name.to_owned(), text_color: text_color }
+        Channel {
+            id: id,
+            name: name.to_owned(),
+            text_color: text_color,
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct ChatMessage {
     pub data: Vec<u8>,
-    pub channel_id: ChannelId
+    pub channel_id: ChannelId,
 }
 
 impl ChatMessage {
     pub fn new<B: Into<Vec<u8>>>(bytes: B, channel_id: ChannelId) -> ChatMessage {
-        ChatMessage { data: bytes.into(), channel_id: channel_id }
+        ChatMessage {
+            data: bytes.into(),
+            channel_id: channel_id,
+        }
     }
 
     pub fn to_owned(&self) -> Vec<u8> {
@@ -41,7 +48,7 @@ impl Iterator for ChatMessage {
     fn next(&mut self) -> Option<u8> {
         match self.data.iter().next() {
             Some(b) => Some(*b),
-            None => None
+            None => None,
         }
     }
 }
@@ -49,7 +56,7 @@ impl Iterator for ChatMessage {
 #[derive(Debug)]
 pub struct ChatPrune {
     pub length: i32,
-    pub enabled: bool
+    pub enabled: bool,
 }
 
 #[derive(Debug)]
@@ -57,18 +64,31 @@ pub struct ChatHistory {
     history: Vec<ChatMessage>,
     history_backup: Vec<ChatMessage>,
     channels: Vec<Channel>,
-    prune: ChatPrune
+    prune: ChatPrune,
 }
 
 impl ChatHistory {
     pub fn new<'a>() -> ChatHistory {
-        ChatHistory { history: vec![], history_backup: vec![], channels: vec![], prune: ChatPrune { length: 0, enabled: false } }
+        ChatHistory {
+            history: vec![],
+            history_backup: vec![],
+            channels: vec![],
+            prune: ChatPrune {
+                length: 0,
+                enabled: false,
+            },
+        }
     }
 
-    pub fn from_existing<'a>(channels: &[((String), [f32; 4])], history: &'a [(&'a str, ChannelId)], prune: ChatPrune) -> ChatHistory {
+    pub fn from_existing<'a>(channels: &[((String), [f32; 4])],
+                             history: &'a [(&'a str, ChannelId)],
+                             prune: ChatPrune)
+                             -> ChatHistory {
         let mut chat_history = ChatHistory::new();
         chat_history.prune = prune;
-        chat_history.history = history.iter().map(|&(msg, chan_id)| {ChatMessage::new((*msg).to_string().into_bytes(), chan_id) }).collect();
+        chat_history.history = history.iter()
+            .map(|&(msg, chan_id)| ChatMessage::new((*msg).to_string().into_bytes(), chan_id))
+            .collect();
 
         for (idx, channels) in channels.iter().enumerate() {
             let &(ref name, color) = channels;
@@ -79,18 +99,16 @@ impl ChatHistory {
     }
 
     pub fn channel_names(&self) -> Vec<(String, [f32; 4])> {
-        let copy_channel_name = |c: &Channel| {
-            (c.name.clone(), c.text_color)
-        };
+        let copy_channel_name = |c: &Channel| (c.name.clone(), c.text_color);
         self.channels.iter().map(copy_channel_name).collect()
     }
 
     pub fn lookup_channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        self.channels.iter_mut().filter(|x| {x.id == id}).next()
+        self.channels.iter_mut().filter(|x| x.id == id).next()
     }
 
     pub fn lookup_channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channels.iter().filter(|x| {x.id == id}).next()
+        self.channels.iter().filter(|x| x.id == id).next()
     }
     pub fn add_channel(&mut self, id: ChannelId, name: &str, text_color: [f32; 4]) -> bool {
         let channel_already_present = self.channel_present(id);
@@ -115,14 +133,16 @@ impl ChatHistory {
     }
 
     fn channel_present(&self, id: ChannelId) -> bool {
-        self.channels.iter().any(|ref x| {x.id == id})
+        self.channels.iter().any(|ref x| x.id == id)
     }
 
     pub fn rename_channel(&mut self, id: ChannelId, name: &str) -> bool {
-        self.lookup_channel_mut(id).and_then(|f| {
-            f.name = String::from(name);
-            Some(f)
-        }).is_some()
+        self.lookup_channel_mut(id)
+            .and_then(|f| {
+                f.name = String::from(name);
+                Some(f)
+            })
+            .is_some()
     }
 
     pub fn prune(&mut self) {
@@ -166,12 +186,15 @@ impl ChatHistory {
 
 pub struct ChatHistoryIterator<'a> {
     data: &'a Vec<ChatMessage>,
-    pos: usize
+    pos: usize,
 }
 
 impl<'a> ChatHistoryIterator<'a> {
     pub fn new(data: &'a Vec<ChatMessage>) -> ChatHistoryIterator<'a> {
-        ChatHistoryIterator { data: data, pos: 0 }
+        ChatHistoryIterator {
+            data: data,
+            pos: 0,
+        }
     }
 }
 
