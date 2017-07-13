@@ -151,8 +151,8 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
     let (triangle_pso, cube_pso) = {
         let mut pso_factory = gpu::PsoFactory::new(&mut factory);
-        let triangle_pso = pso_factory.make_triangle_list_pso();
-        let cube_pso = pso_factory.make_triangle_strip_pso();
+        let triangle_pso = pso_factory.triangle_list();
+        let cube_pso = pso_factory.triangle_strip();
         (triangle_pso, cube_pso)
     };
 

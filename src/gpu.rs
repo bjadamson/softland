@@ -124,7 +124,7 @@ impl<'a, R, F> PsoFactory<'a, R, F>
         }
     }
 
-    pub fn make_triangle_strip_pso(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
+    pub fn triangle_strip(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
         let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
         let primitive = gfx::Primitive::TriangleStrip;
         let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
@@ -132,7 +132,7 @@ impl<'a, R, F> PsoFactory<'a, R, F>
         self.factory.create_pipeline_state(&set, primitive, rasterizer, pipe).unwrap()
     }
 
-    pub fn make_triangle_list_pso(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
+    pub fn triangle_list(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
         let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
         let primitive = gfx::Primitive::TriangleList;
         let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
