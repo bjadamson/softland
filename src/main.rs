@@ -31,7 +31,7 @@ mod color;
 mod gpu;
 mod shape;
 mod state;
-mod support_gfx;
+mod support;
 mod ui;
 
 const CLEAR_COLOR: [f32; 4] = [0.2, 0.7, 0.8, 0.89];
@@ -39,14 +39,12 @@ const CLEAR_COLOR: [f32; 4] = [0.2, 0.7, 0.8, 0.89];
 struct SupportSystem;
 
 impl<'a> System<'a> for SupportSystem {
-    type SystemData = WriteStorage<'a, State>;
+    type SystemData = FetchMut<'a, State>;
 
-    fn run(&mut self, mut state: Self::SystemData) {
+    fn run(&mut self, mut data: Self::SystemData) {
         use specs::Join;
 
-        for t in (&mut state).join() {
-            support_gfx::run("Softland", CLEAR_COLOR, t, ui::render_ui);
-        }
+        support::run_game("Softland", CLEAR_COLOR, &mut *data, ui::render_ui);
     }
 }
 
@@ -151,9 +149,8 @@ fn main() {
 
     let mut world = World::new();
     world.register::<State>();
+    world.add_resource(state);
 
-    world.create_entity().with(state).build();
-    // world.add_resource(state);
     let mut dispatcher = DispatcherBuilder::new().add_thread_local(SupportSystem).build();
     dispatcher.dispatch(&mut world.res);
 }

@@ -126,10 +126,10 @@ macro_rules! process_event {
 }
 
 
-pub fn run<F: FnMut(&Ui, &mut State)>(title: &str,
-                                      clear_color: [f32; 4],
-                                      game: &mut State,
-                                      mut build_ui: F) {
+pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
+                                           clear_color: [f32; 4],
+                                           game: &mut State,
+                                           mut build_ui: F) {
     let mut imgui = ImGui::init();
 
     let (w, h) = game.window_dimensions;
