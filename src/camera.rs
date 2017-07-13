@@ -45,14 +45,6 @@ impl Camera {
         Vec3::normalize(Vec3::cross(self.front, self.up))
     }
 
-    // fn xpan(&d: f32) -> Vec3 {
-    // Vec3::new(d, 0.0, 0.0);
-    // }
-
-    // fn ypan(d: f32) -> Vec3 {
-    // Vec3::new(0.0, -d, 0.0);
-    // }
-
     fn move_dir(&mut self, s: f32, dir: &Vec3) {
         self.front += dir * s;
         // self.skybox_.model.translation = this->front;
@@ -105,5 +97,13 @@ impl Camera {
 
     pub fn position(&self) -> Vec3 {
         self.front
+    }
+
+    pub fn pan_x(&mut self, s: f32) {
+        self.move_dir(s, &Vector3::new(1.0, 0.0, 0.0));
+    }
+
+    pub fn pan_y(&mut self, s: f32) {
+        self.move_dir(s, &Vector3::new(0.0, 1.0, 0.0));
     }
 }

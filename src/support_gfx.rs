@@ -43,10 +43,22 @@ macro_rules! process_event {
                 let camera = &mut player.camera;
                 match code {
                     Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
-                    Some(VirtualKeyCode::Left) => $imgui.set_key(1, pressed),
-                    Some(VirtualKeyCode::Right) => $imgui.set_key(2, pressed),
-                    Some(VirtualKeyCode::Up) => $imgui.set_key(3, pressed),
-                    Some(VirtualKeyCode::Down) => $imgui.set_key(4, pressed),
+                    Some(VirtualKeyCode::Left) => {
+                        $imgui.set_key(1, pressed);
+                        camera.pan_x(-player.move_speed);
+                    }
+                    Some(VirtualKeyCode::Right) => {
+                        $imgui.set_key(2, pressed);
+                        camera.pan_x(player.move_speed);
+                    }
+                    Some(VirtualKeyCode::Up) => {
+                        $imgui.set_key(3, pressed);
+                        camera.pan_y(player.move_speed);
+                    }
+                    Some(VirtualKeyCode::Down) => {
+                        $imgui.set_key(4, pressed);
+                        camera.pan_y(-player.move_speed);
+                    }
                     Some(VirtualKeyCode::PageUp) => $imgui.set_key(5, pressed),
                     Some(VirtualKeyCode::PageDown) => $imgui.set_key(6, pressed),
                     Some(VirtualKeyCode::Home) => $imgui.set_key(7, pressed),
@@ -194,7 +206,6 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str,
 
             let projection = Matrix4::identity();
             let view = game.player.camera.compute_view();
-            // let view = Matrix4::from_diagonal(view);
 
             let angle = cgmath::Deg(sim_time.frame_number() as f32);
             let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
@@ -207,7 +218,7 @@ pub fn run<F: FnMut(&Ui, &mut State)>(title: &str,
             let mmatrix = Matrix4::identity() * rot;
             let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
-            gpu.draw_triangle(&triangle_pso, radius, &colors, mmatrix);
+            gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
         }
 
         // 3. Construct our UI.
