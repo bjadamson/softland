@@ -2,22 +2,6 @@ use camera::Camera;
 use chat_history::*;
 use imgui::*;
 
-#[derive(Copy, Clone, Debug)]
-pub struct ChatWindowState {
-    pub dimensions: (f32, f32),
-    pub offset: (f32, f32),
-    pub button_padding: f32,
-    pub window_rounding: f32,
-    pub max_length_chat_input_text: usize,
-    pub max_length_menu_input_text: usize,
-    pub pos: (f32, f32),
-    pub movable: bool,
-    pub resizable: bool,
-    pub save_settings: bool,
-    pub view_all: bool,
-    pub user_editing: bool,
-}
-
 #[derive(Debug)]
 pub struct State {
     pub ui_buffers: UiBuffers,
@@ -36,6 +20,22 @@ pub struct State {
 pub struct Player {
     pub camera: Camera,
     pub move_speed: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ChatWindowState {
+    pub dimensions: (f32, f32),
+    pub offset: (f32, f32),
+    pub button_padding: f32,
+    pub window_rounding: f32,
+    pub max_length_chat_input_text: usize,
+    pub max_length_menu_input_text: usize,
+    pub pos: (f32, f32),
+    pub movable: bool,
+    pub resizable: bool,
+    pub save_settings: bool,
+    pub view_all: bool,
+    pub user_editing: bool,
 }
 
 #[derive(Clone, Debug)]
