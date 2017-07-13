@@ -125,6 +125,7 @@ macro_rules! process_event {
     )
 }
 
+
 pub fn run<F: FnMut(&Ui, &mut State)>(title: &str,
                                       clear_color: [f32; 4],
                                       game: &mut State,

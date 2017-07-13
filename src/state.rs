@@ -2,6 +2,8 @@ use camera::Camera;
 use chat_history::*;
 use imgui::*;
 
+use specs::*;
+
 #[derive(Debug)]
 pub struct State {
     pub ui_buffers: UiBuffers,
@@ -14,6 +16,10 @@ pub struct State {
     pub window_dimensions: (u32, u32),
 
     pub player: Player,
+}
+
+impl Component for State {
+    type Storage = VecStorage<Self>;
 }
 
 #[derive(Debug)]

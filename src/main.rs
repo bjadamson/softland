@@ -22,6 +22,9 @@ use camera::Camera;
 use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, Player, State, UiBuffers};
 
+extern crate specs;
+use specs::*;
+
 mod camera;
 mod chat_history;
 mod color;
@@ -32,6 +35,20 @@ mod support_gfx;
 mod ui;
 
 const CLEAR_COLOR: [f32; 4] = [0.2, 0.7, 0.8, 0.89];
+
+struct SupportSystem;
+
+impl<'a> System<'a> for SupportSystem {
+    type SystemData = WriteStorage<'a, State>;
+
+    fn run(&mut self, mut state: Self::SystemData) {
+        use specs::Join;
+
+        for t in (&mut state).join() {
+            support_gfx::run("Softland", CLEAR_COLOR, t, ui::render_ui);
+        }
+    }
+}
 
 fn main() {
     let chat_config = ChatWindowState {
@@ -116,7 +133,7 @@ fn main() {
         menu_color_buffer: Default::default(),
         menu_color_buffer_backup: Default::default(),
     };
-    let mut state = State {
+    let state = State {
         ui_buffers: ui_buffers,
         chat_history: ChatHistory::from_existing(&init_channels, chat_history_text, prune),
         chat_button_pressed: ChannelId::new(0),
@@ -131,5 +148,12 @@ fn main() {
             move_speed: 0.2,
         },
     };
-    support_gfx::run("Softland", CLEAR_COLOR, &mut state, ui::render_ui);
+
+    let mut world = World::new();
+    world.register::<State>();
+
+    world.create_entity().with(state).build();
+    // world.add_resource(state);
+    let mut dispatcher = DispatcherBuilder::new().add_thread_local(SupportSystem).build();
+    dispatcher.dispatch(&mut world.res);
 }
