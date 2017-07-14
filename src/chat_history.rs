@@ -80,14 +80,18 @@ impl ChatHistory {
         }
     }
 
-    pub fn from_existing<'a>(channels: &[((String), [f32; 4])],
-                             history: &'a [(&'a str, ChannelId)],
-                             prune: ChatPrune)
-                             -> ChatHistory {
+    pub fn from_existing<'a>(
+        channels: &[((String), [f32; 4])],
+        history: &'a [(&'a str, ChannelId)],
+        prune: ChatPrune,
+    ) -> ChatHistory {
         let mut chat_history = ChatHistory::new();
         chat_history.prune = prune;
-        chat_history.history = history.iter()
-            .map(|&(msg, chan_id)| ChatMessage::new((*msg).to_string().into_bytes(), chan_id))
+        chat_history.history = history
+            .iter()
+            .map(|&(msg, chan_id)| {
+                ChatMessage::new((*msg).to_string().into_bytes(), chan_id)
+            })
             .collect();
 
         for (idx, channels) in channels.iter().enumerate() {
@@ -150,7 +154,9 @@ impl ChatHistory {
         let history_length = self.history.len();
         if length < history_length {
             let extend_length = history_length - length;
-            self.history_backup.extend(self.history.drain(..extend_length));
+            self.history_backup.extend(
+                self.history.drain(..extend_length),
+            );
         }
     }
 
@@ -191,10 +197,7 @@ pub struct ChatHistoryIterator<'a> {
 
 impl<'a> ChatHistoryIterator<'a> {
     pub fn new(data: &'a Vec<ChatMessage>) -> ChatHistoryIterator<'a> {
-        ChatHistoryIterator {
-            data: data,
-            pos: 0,
-        }
+        ChatHistoryIterator { data: data, pos: 0 }
     }
 }
 

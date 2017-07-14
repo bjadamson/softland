@@ -1,9 +1,6 @@
 extern crate cgmath;
 use cgmath::*;
 
-// extern crate num_traits;
-// use self::num_traits::identities::Zero;
-
 type Vec3 = Vector3<f32>;
 type Vec4 = Vector4<f32>;
 type Mat4 = Matrix4<f32>;
@@ -23,12 +20,12 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Camera {
         Camera {
-            front: Vec3::zero(),
-            up: Vec3::zero(),
+            front: [0.0, 0.0, -1.0].into(),
+            up: [0.0, 1.0, 0.0].into(),
             pitch: Default::default(),
             roll: Default::default(),
             yaw: Default::default(),
-            orientation: Quaternion::one(),
+            orientation: Quaternion::zero(),
         }
     }
 
@@ -61,7 +58,7 @@ impl Camera {
         let mat = self.compute_view();
         let strafe = -mat[0];
         let strafe = Vec3::new(strafe.x, strafe.y, strafe.z);
-        self.move_dir(s, &strafe)
+        self.move_dir(s, &strafe);
     }
 
     fn move_y(&mut self, s: f32) {

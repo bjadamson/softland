@@ -10,13 +10,21 @@ use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
 
-
 use game_time::{GameClock, FrameCounter, FrameCount};
 use game_time::framerate::RunningAverageSampler;
 use game_time::step;
 
+use genmesh::generators::*;
+use genmesh::{Vertices, Triangulate};
+
 use color;
 use gpu;
+
+use noise::{Perlin, NoiseModule, Seedable};
+use rand;
+use rand::*;
+
+use shader;
 use state::State;
 
 pub type ColorFormat = gfx::format::Rgba8;
@@ -125,11 +133,55 @@ macro_rules! process_event {
     )
 }
 
+fn calculate_color(height: f32) -> [f32; 4] {
+    let c = {
+        if height > 8.0 {
+            [0.9, 0.9, 0.9] // white
+        } else if height > 0.0 {
+            [0.7, 0.7, 0.7] // greay
+        } else if height > -5.0 {
+            [0.2, 0.7, 0.2] // green
+        } else {
+            [0.2, 0.2, 0.7] // blue
+        }
+    };
+    [c[0], c[1], c[2], 1.0]
+}
 
-pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
-                                           clear_color: [f32; 4],
-                                           game: &mut State,
-                                           mut build_ui: F) {
+fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
+    let seed = rand::thread_rng().gen();
+    let plane = Plane::subdivide(256, 256);
+    let perlin = Perlin::new().set_seed(seed);
+    let vertexes: Vec<shader::Vertex> = plane
+        .shared_vertex_iter()
+        .take(n)
+        .map(|v| {
+            let pos = v.pos;
+            let value = perlin.get(pos);
+            let pos = [pos[0], pos[1], value, 1.0];
+            shader::Vertex {
+                pos: pos,
+                color: calculate_color(value),
+            }
+        })
+        .collect();
+
+    let indices : Vec<u32> = plane
+        .indexed_polygon_iter()
+        .take(n)
+        .triangulate()
+        .vertices()
+        .map(|i| i as u32)
+        .collect();
+    (vertexes, indices)
+}
+
+pub fn run_game<F: FnMut(&Ui, &mut State)>(
+    title: &str,
+    clear_color: [f32; 4],
+    game: &mut State,
+    mut build_ui: F,
+) {
     let mut imgui = ImGui::init();
 
     let (w, h) = game.window_dimensions;
@@ -146,15 +198,20 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
     configure_keys(&mut imgui);
 
-    let mut last_frame = Instant::now();
-    let mut mouse_state = MouseState::default();
+    println!("making ...");
+    let (plane_vertices, plane_indices) = make_geometry(90000);
+    println!("done!");
 
-    let (triangle_pso, cube_pso) = {
+    let (triangle_pso, cube_pso, generated_pso) = {
         let mut pso_factory = gpu::PsoFactory::new(&mut factory);
         let triangle_pso = pso_factory.triangle_list();
         let cube_pso = pso_factory.triangle_strip();
-        (triangle_pso, cube_pso)
+        let generated_pso = pso_factory.triangle_list();
+        (triangle_pso, cube_pso, generated_pso)
     };
+
+    let mut last_frame = Instant::now();
+    let mut mouse_state = MouseState::default();
 
     let mut clock = GameClock::new();
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
@@ -166,14 +223,16 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
         game.framerate = sim_time.instantaneous_frame_rate();
 
         events_loop.poll_events(|glutin::Event::WindowEvent { event, .. }| {
-            process_event!(event,
-                           imgui,
-                           window,
-                           renderer,
-                           mouse_state,
-                           game,
-                           main_color,
-                           main_depth);
+            process_event!(
+                event,
+                imgui,
+                window,
+                renderer,
+                mouse_state,
+                game,
+                main_color,
+                main_depth
+            );
         });
 
         let now = Instant::now();
@@ -196,38 +255,55 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
 
             let dimensions = (0.25, 0.25, 0.25);
-            let rect_colors: [[f32; 4]; 8] = [color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW];
-
-            let projection = Matrix4::identity();
+            let rect_colors: [[f32; 4]; 8] = [
+                color::RED,
+                color::YELLOW,
+                color::RED,
+                color::YELLOW,
+                color::RED,
+                color::YELLOW,
+                color::RED,
+                color::YELLOW,
+            ];
+            
             let view = game.player.camera.compute_view();
-
             let angle = cgmath::Deg(sim_time.frame_number() as f32);
+
+            // non-ui 2d stuffz
+            let projection = Matrix4::identity();
             let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
             let mmatrix = Matrix4::identity() * rot;
             let uv_matrix = projection * view * mmatrix;
 
             gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, uv_matrix);
-
+            
             let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
             let mmatrix = Matrix4::identity() * rot;
             let colors = [color::BLACK, color::GREEN, color::BLUE];
             let radius = 0.15;
             let uv_matrix = projection * view * mmatrix;
             gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
+
+            let projection = {
+                let (width, height) = game.window_dimensions;
+                let aspect_ratio = width / height;
+                let (near, far) = (0.1, 200.0);
+                let fovy = cgmath::Deg(60.0);
+                cgmath::perspective(fovy, aspect_ratio as f32, near, far)
+            };
+
+            let mmatrix = Matrix4::identity();
+            let uv_matrix = projection * view * mmatrix;
+            gpu.draw_triangle_from_vertices(&generated_pso, &plane_vertices, &plane_indices, uv_matrix);            
         }
 
         // 3. Construct our UI.
         build_ui(&ui, game);
 
         // 4. Draw our scene (both UI and geometry submitted via encoder).
-        renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
+        renderer.render(ui, &mut factory, &mut encoder).expect(
+            "Rendering failed",
+        );
 
         // 3) Flush our device and swap the buffers.
         encoder.flush(&mut device);
@@ -264,13 +340,19 @@ fn configure_keys(imgui: &mut ImGui) {
 
 fn update_mouse(imgui: &mut ImGui, mouse_state: &mut MouseState) {
     let scale = imgui.display_framebuffer_scale();
-    imgui.set_mouse_pos(mouse_state.pos.0 as f32 / scale.0,
-                        mouse_state.pos.1 as f32 / scale.1);
-    imgui.set_mouse_down(&[mouse_state.pressed.0,
-                           mouse_state.pressed.1,
-                           mouse_state.pressed.2,
-                           false,
-                           false]);
+    imgui.set_mouse_pos(
+        mouse_state.pos.0 as f32 / scale.0,
+        mouse_state.pos.1 as f32 / scale.1,
+    );
+    imgui.set_mouse_down(
+        &[
+            mouse_state.pressed.0,
+            mouse_state.pressed.1,
+            mouse_state.pressed.2,
+            false,
+            false,
+        ],
+    );
     imgui.set_mouse_wheel(mouse_state.wheel / scale.1);
     mouse_state.wheel = 0.0;
 }
