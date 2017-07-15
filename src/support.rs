@@ -23,8 +23,10 @@ use gpu;
 use noise::{Perlin, NoiseModule, Seedable};
 use rand;
 use rand::*;
+use specs::*;
 
 use shader;
+use state;
 use state::State;
 
 pub type ColorFormat = gfx::format::Rgba8;
@@ -38,16 +40,16 @@ struct MouseState {
 }
 
 macro_rules! process_event {
-    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse_state:ident, $game:ident, $main_color:ident, $main_depth:ident) => (
+    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse_state:ident, $game_state:ident, $main_color:ident, $main_depth:ident) => (
         match $event {
             WindowEvent::Resized(_, _) => {
                 gfx_window_glutin::update_views(&$window, &mut $main_color, &mut $main_depth);
                 $renderer.update_render_target($main_color.clone());
             }
-            WindowEvent::Closed => $game.quit = true,
+            WindowEvent::Closed => $game_state.quit = true,
             WindowEvent::KeyboardInput(state, _, code, _) => {
                 let pressed = state == ElementState::Pressed;
-                let player = &mut $game.player;
+                let player = &mut $game_state.player;
                 let camera = &mut player.camera;
                 match code {
                     Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
@@ -78,9 +80,9 @@ macro_rules! process_event {
                         $imgui.set_key(11, pressed);
 
 // 2. Update our state w/regard to chat input.
-                        $game.chat_window_state.user_editing = state == ElementState::Released;
+                        $game_state.chat_window_state.user_editing = state == ElementState::Released;
                     },
-                    Some(VirtualKeyCode::Escape) => $game.quit = true,
+                    Some(VirtualKeyCode::Escape) => $game_state.quit = true,
                     Some(VirtualKeyCode::A) => {
                         $imgui.set_key(13, pressed);
 
@@ -174,13 +176,28 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
     (vertexes, indices)
 }
 
+struct TestSystem;
+
+impl<'a> System<'a> for TestSystem {
+    type SystemData = WriteStorage<'a, state::Model>;
+
+    fn run(&mut self, mut model: Self::SystemData) {
+        println!("TestSystem::run() fn here");
+        for model in (&mut model).join() {
+            model.rotation = Quaternion::from_angle_x(cgmath::Deg(10.0));
+        }
+    }
+}
+
+
+
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
-                                           game: &mut State,
+                                           mut state: State,
                                            mut build_ui: F) {
     let mut imgui = ImGui::init();
 
-    let (w, h) = game.window_dimensions;
+    let (w, h) = state.window_dimensions;
     let events_loop = glutin::EventsLoop::new();
     let builder = glutin::WindowBuilder::new()
         .with_title(title)
@@ -213,99 +230,114 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
 
+    let mut world = World::new();
+    world.register::<state::Model>();
+    world.register::<State>();
+
+    world.add_resource(state);
+    world.create_entity().with(state::Model::new()).build();
+
+    let mut dispatcher = DispatcherBuilder::new()
+        .add(TestSystem, "TestSystem", &[])
+        .build();
+
     loop {
-        sim_time = clock.tick(&step::FixedStep::new(&counter));
-        counter.tick(&sim_time);
-        game.framerate = sim_time.instantaneous_frame_rate();
-
-        events_loop.poll_events(|glutin::Event::WindowEvent { event, .. }| {
-            process_event!(event,
-                           imgui,
-                           window,
-                           renderer,
-                           mouse_state,
-                           game,
-                           main_color,
-                           main_depth);
-        });
-
-        let now = Instant::now();
-        let delta = now - last_frame;
-        let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
-        last_frame = now;
-
-        update_mouse(&mut imgui, &mut mouse_state);
-        let size_points = window.get_inner_size_points().unwrap();
-        let size_pixels = window.get_inner_size_pixels().unwrap();
-        let ui = imgui.frame(size_points, size_pixels, delta_s);
-
-        // Draw our scene
-        //
-        // 1. Clear the background.
-        encoder.clear(&mut main_color, clear_color);
-
-        // 2. Submit geometry to GPU.
         {
-            let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
+            let mut state = &mut *world.write_resource::<State>();
+            sim_time = clock.tick(&step::FixedStep::new(&counter));
+            counter.tick(&sim_time);
+            state.framerate = sim_time.instantaneous_frame_rate();
 
-            let dimensions = (0.25, 0.25, 0.25);
-            let rect_colors: [[f32; 4]; 8] = [color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW];
+            events_loop.poll_events(|glutin::Event::WindowEvent { event, .. }| {
+                process_event!(event,
+                               imgui,
+                               window,
+                               renderer,
+                               mouse_state,
+                               state,
+                               main_color,
+                               main_depth);
+            });
 
-            let view = game.player.camera.compute_view();
-            let angle = cgmath::Deg(sim_time.frame_number() as f32);
+            let now = Instant::now();
+            let delta = now - last_frame;
+            let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
+            last_frame = now;
 
-            // non-ui 2d stuffz
-            let projection = Matrix4::identity();
-            let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
-            let mmatrix = Matrix4::identity() * rot;
-            let uv_matrix = projection * view * mmatrix;
+            update_mouse(&mut imgui, &mut mouse_state);
+            let size_points = window.get_inner_size_points().unwrap();
+            let size_pixels = window.get_inner_size_pixels().unwrap();
+            let ui = imgui.frame(size_points, size_pixels, delta_s);
 
-            gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, uv_matrix);
+            // Draw our scene
+            //
+            // 1. Clear the background.
+            encoder.clear(&mut main_color, clear_color);
 
-            let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
-            let mmatrix = Matrix4::identity() * rot;
-            let colors = [color::BLACK, color::GREEN, color::BLUE];
-            let radius = 0.15;
-            let uv_matrix = projection * view * mmatrix;
-            gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
+            // 2. Submit geometry to GPU.
+            {
+                let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
 
-            let projection = {
-                let (width, height) = game.window_dimensions;
-                let aspect_ratio = width / height;
-                let (near, far) = (0.1, 200.0);
-                let fovy = cgmath::Deg(60.0);
-                cgmath::perspective(fovy, aspect_ratio as f32, near, far)
-            };
+                let dimensions = (0.25, 0.25, 0.25);
+                let rect_colors: [[f32; 4]; 8] = [color::RED,
+                                                  color::YELLOW,
+                                                  color::RED,
+                                                  color::YELLOW,
+                                                  color::RED,
+                                                  color::YELLOW,
+                                                  color::RED,
+                                                  color::YELLOW];
 
-            let mmatrix = Matrix4::identity();
-            let uv_matrix = projection * view * mmatrix;
-            gpu.draw_triangle_from_vertices(&generated_pso,
-                                            &plane_vertices,
-                                            &plane_indices,
-                                            uv_matrix);
+                let view = state.player.camera.compute_view();
+                let angle = cgmath::Deg(sim_time.frame_number() as f32);
+
+                // non-ui 2d stuffz
+                let projection = Matrix4::identity();
+                let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
+                let mmatrix = Matrix4::identity() * rot;
+                let uv_matrix = projection * view * mmatrix;
+
+                gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, uv_matrix);
+
+                let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
+                let mmatrix = Matrix4::identity() * rot;
+                let colors = [color::BLACK, color::GREEN, color::BLUE];
+                let radius = 0.15;
+                let uv_matrix = projection * view * mmatrix;
+                gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
+
+                let projection = {
+                    let (width, height) = state.window_dimensions;
+                    let aspect_ratio = width / height;
+                    let (near, far) = (0.1, 200.0);
+                    let fovy = cgmath::Deg(60.0);
+                    cgmath::perspective(fovy, aspect_ratio as f32, near, far)
+                };
+
+                let mmatrix = Matrix4::identity();
+                let uv_matrix = projection * view * mmatrix;
+                gpu.draw_triangle_from_vertices(&generated_pso,
+                                                &plane_vertices,
+                                                &plane_indices,
+                                                uv_matrix);
+            }
+
+            // 3. Construct our UI.
+            build_ui(&ui, &mut state);
+
+            // 4. Draw our scene (both UI and geometry submitted via encoder).
+            renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
+
+            // 3) Flush our device and swap the buffers.
+            encoder.flush(&mut device);
+            window.swap_buffers().unwrap();
+            device.cleanup();
+
+            if state.quit {
+                break;
+            }
         }
-
-        // 3. Construct our UI.
-        build_ui(&ui, game);
-
-        // 4. Draw our scene (both UI and geometry submitted via encoder).
-        renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
-
-        // 3) Flush our device and swap the buffers.
-        encoder.flush(&mut device);
-        window.swap_buffers().unwrap();
-        device.cleanup();
-
-        if game.quit {
-            break;
-        }
+        dispatcher.dispatch(&mut world.res);
     }
 }
 

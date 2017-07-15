@@ -28,7 +28,6 @@ extern crate noise;
 extern crate rand;
 
 extern crate specs;
-use specs::*;
 
 mod camera;
 mod chat_history;
@@ -41,37 +40,6 @@ mod support;
 mod ui;
 
 const CLEAR_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
-
-struct MainSystem;
-
-impl<'a> System<'a> for MainSystem {
-    type SystemData = (FetchMut<'a, State>, ReadStorage<'a, state::Model>);
-
-    fn run(&mut self, (mut state, model): Self::SystemData) {
-        use specs::Join;
-
-        // (state, model).join();
-        for model in (&model).join() {
-        }
-
-        // for (&mut state, &model) in (&mut state, &model).join() {
-        // }
-        support::run_game("Softland", CLEAR_COLOR, &mut *state, ui::render_ui);
-    }
-}
-
-struct TestSystem;
-
-impl<'a> System<'a> for TestSystem {
-    type SystemData = WriteStorage<'a, state::Model>;
-
-    fn run(&mut self, mut model: Self::SystemData) {
-        println!("TestSystem::run() fn here");
-        for model in (&mut model).join() {
-            model.rotation = Quaternion::from_angle_x(cgmath::Deg(10.0));
-        }
-    }
-}
 
 fn main() {
     let chat_config = ChatWindowState {
@@ -173,17 +141,5 @@ fn main() {
     };
 
     state.player.camera.move_backward(5.0);
-
-    let mut world = World::new();
-    world.register::<state::Model>();
-    world.register::<State>();
-
-    world.add_resource(state);
-    world.create_entity().with(state::Model::new()).build();
-
-    let mut dispatcher = DispatcherBuilder::new()
-        .add(TestSystem, "TestSystem", &[])
-        .add_thread_local(MainSystem)
-        .build();
-    dispatcher.dispatch(&mut world.res);
+    support::run_game("Softland", CLEAR_COLOR, state, ui::render_ui);
 }
