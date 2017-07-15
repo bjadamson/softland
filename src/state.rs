@@ -1,5 +1,7 @@
 use camera::Camera;
 use chat_history::*;
+
+use cgmath::*;
 use imgui::*;
 
 use specs::*;
@@ -26,6 +28,27 @@ impl Component for State {
 pub struct Player {
     pub camera: Camera,
     pub move_speed: f32,
+}
+
+#[derive(Debug)]
+pub struct Model {
+    pub translation: Vector3<f32>,
+    pub rotation: Quaternion<f32>,
+    pub scale: Vector3<f32>,
+}
+
+impl Component for Model {
+    type Storage = VecStorage<Self>;
+}
+
+impl Model {
+    pub fn new() -> Model {
+        Model {
+            translation: Vector3::new(0.0, 0.0, 0.0),
+            rotation: Quaternion::zero(),
+            scale: Vector3::new(1.0, 1.0, 1.0),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -1,4 +1,3 @@
-extern crate cgmath;
 use cgmath::*;
 
 type Vec3 = Vector3<f32>;
