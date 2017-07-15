@@ -184,7 +184,8 @@ impl<'a> System<'a> for TestSystem {
     fn run(&mut self, mut model: Self::SystemData) {
         println!("TestSystem::run() fn here");
         for model in (&mut model).join() {
-            model.rotation = Quaternion::from_angle_x(cgmath::Deg(10.0));
+            model.translation.x += 1.0;
+            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.translation.x));
         }
     }
 }
@@ -244,6 +245,9 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     loop {
         {
             let mut state = &mut *world.write_resource::<State>();
+            for m in world.read::<state::Model>().join() {
+                println!("main thread: {:?}", m);
+            }
             sim_time = clock.tick(&step::FixedStep::new(&counter));
             counter.tick(&sim_time);
             state.framerate = sim_time.instantaneous_frame_rate();
@@ -265,9 +269,6 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             last_frame = now;
 
             update_mouse(&mut imgui, &mut mouse_state);
-            let size_points = window.get_inner_size_points().unwrap();
-            let size_pixels = window.get_inner_size_pixels().unwrap();
-            let ui = imgui.frame(size_points, size_pixels, delta_s);
 
             // Draw our scene
             //
@@ -323,6 +324,9 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             }
 
             // 3. Construct our UI.
+            let size_points = window.get_inner_size_points().unwrap();
+            let size_pixels = window.get_inner_size_pixels().unwrap();
+            let ui = imgui.frame(size_points, size_pixels, delta_s);
             build_ui(&ui, &mut state);
 
             // 4. Draw our scene (both UI and geometry submitted via encoder).
