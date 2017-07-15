@@ -45,12 +45,18 @@ const CLEAR_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 struct MainSystem;
 
 impl<'a> System<'a> for MainSystem {
-    type SystemData = FetchMut<'a, State>;
+    type SystemData = (FetchMut<'a, State>, ReadStorage<'a, state::Model>);
 
-    fn run(&mut self, mut data: Self::SystemData) {
+    fn run(&mut self, (mut state, model): Self::SystemData) {
         use specs::Join;
 
-        support::run_game("Softland", CLEAR_COLOR, &mut *data, ui::render_ui);
+        // (state, model).join();
+        for model in (&model).join() {
+        }
+
+        // for (&mut state, &model) in (&mut state, &model).join() {
+        // }
+        support::run_game("Softland", CLEAR_COLOR, &mut *state, ui::render_ui);
     }
 }
 
