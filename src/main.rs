@@ -74,7 +74,7 @@ fn main() {
           ("PizzaMan: Yo I'm here to deliver this pizza, I'll just leave it over here by the \
             dragon ok?",
            ChannelId::new(2)),
-          ("Moo:grass plz", ChannelId::new(3)),
+          ("Moo: grass plz", ChannelId::new(3)),
           ("Aladin: STFU Jafar", ChannelId::new(4)),
           ("Rocky: JKSLFJS", ChannelId::new(5)),
           ("You took 31 damage.", ChannelId::new(1)),
