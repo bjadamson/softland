@@ -19,15 +19,22 @@ extern crate min_max_macros;
 use imgui::*;
 use itertools::Itertools;
 
+#[macro_use]
+extern crate serde_derive;
+
 use camera::Camera;
 use chat_history::{ChannelId, ChatHistory, ChatPrune};
 use state::{ChatWindowState, EditingFieldOption, Player, State, UiBuffers};
+
+use std::fs::File;
+use std::io::prelude::*;
 
 extern crate genmesh;
 extern crate noise;
 extern crate rand;
 
 extern crate specs;
+extern crate toml;
 
 mod camera;
 mod chat_history;
@@ -141,5 +148,13 @@ fn main() {
     };
 
     state.player.camera.move_backward(5.0);
-    support::run_game("Softland", CLEAR_COLOR, state, ui::render_ui);
+
+    let contents = {
+        let mut file = File::open("data/foo.txt").unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        contents
+    };
+
+    support::run_game("Softland", CLEAR_COLOR, state, &contents, ui::render_ui);
 }

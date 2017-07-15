@@ -28,6 +28,7 @@ use specs::*;
 use shader;
 use state;
 use state::State;
+use toml;
 
 pub type ColorFormat = gfx::format::Rgba8;
 pub type DepthFormat = gfx::format::DepthStencil;
@@ -184,17 +185,16 @@ impl<'a> System<'a> for TestSystem {
     fn run(&mut self, mut model: Self::SystemData) {
         println!("TestSystem::run() fn here");
         for model in (&mut model).join() {
-            model.translation.x += 1.0;
-            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.translation.x));
+            model.count += 1.0;
+            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.count));
         }
     }
 }
 
-
-
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
-                                           mut state: State,
+                                           state: State,
+                                           file_contents: &str,
                                            mut build_ui: F) {
     let mut imgui = ImGui::init();
 
@@ -224,23 +224,43 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
         (triangle_pso, cube_pso, generated_pso)
     };
 
-    let mut last_frame = Instant::now();
-    let mut mouse_state = MouseState::default();
+    #[derive(Debug, Deserialize, Serialize)]
+    struct Rectangles {
+        values: Vec<(f32, f32, f32)>,
+    }
 
-    let mut clock = GameClock::new();
-    let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
-    let mut sim_time;
+    #[derive(Debug, Deserialize, Serialize)]
+    struct FooTxtFile {
+        rectangles: Rectangles,
+    }
+
+    println!("about to toml file contents");
+    let foo_content: FooTxtFile = toml::from_str(file_contents).unwrap();
+    println!("foo: {:?}", foo_content);
 
     let mut world = World::new();
     world.register::<state::Model>();
     world.register::<State>();
 
     world.add_resource(state);
-    world.create_entity().with(state::Model::new()).build();
+
+    for &(x, y, z) in foo_content.rectangles.values.iter() {
+        println!("creating triangle w/xyz: {} {} {}", x, y, z);
+        let mut model = state::Model::new();
+        model.translation = Vector3::new(x, y, z);
+        world.create_entity().with(model).build();
+    }
 
     let mut dispatcher = DispatcherBuilder::new()
         .add(TestSystem, "TestSystem", &[])
         .build();
+
+    let mut last_frame = Instant::now();
+    let mut mouse_state = MouseState::default();
+
+    let mut clock = GameClock::new();
+    let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
+    let mut sim_time;
 
     loop {
         {
@@ -293,20 +313,6 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                 let angle = cgmath::Deg(sim_time.frame_number() as f32);
 
                 // non-ui 2d stuffz
-                let projection = Matrix4::identity();
-                let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_y(angle);
-                let mmatrix = Matrix4::identity() * rot;
-                let uv_matrix = projection * view * mmatrix;
-
-                gpu.draw_cube(&cube_pso, &dimensions, &rect_colors, uv_matrix);
-
-                let rot = Matrix4::from_angle_x(angle) * Matrix4::from_angle_z(angle);
-                let mmatrix = Matrix4::identity() * rot;
-                let colors = [color::BLACK, color::GREEN, color::BLUE];
-                let radius = 0.15;
-                let uv_matrix = projection * view * mmatrix;
-                gpu.draw_triangle(&triangle_pso, radius, &colors, uv_matrix);
-
                 let projection = {
                     let (width, height) = state.window_dimensions;
                     let aspect_ratio = width / height;
@@ -314,6 +320,28 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                     let fovy = cgmath::Deg(60.0);
                     cgmath::perspective(fovy, aspect_ratio as f32, near, far)
                 };
+
+                // draw based on data from foo.txt
+                for model in world.read::<state::Model>().join() {
+                    let tmatrix = Matrix4::from_translation(model.translation);
+                    let rmatrix: Matrix4<f32> = model.rotation.into();
+                    let smatrix =
+                        Matrix4::from_nonuniform_scale(model.scale.x, model.scale.y, model.scale.z);
+
+                    let mmatrix = tmatrix * rmatrix * smatrix;
+                    let uv_matrix = projection * view * mmatrix;
+
+                    let colors = [color::BLACK,
+                                  color::GREEN,
+                                  color::BLUE,
+                                  color::PURPLE,
+                                  color::BLACK,
+                                  color::GREEN,
+                                  color::BLUE,
+                                  color::PURPLE];
+                    gpu.draw_cube(&cube_pso, &dimensions, &colors, uv_matrix);
+                    println!("drawing triangle from file: {:?}", model);
+                }
 
                 let mmatrix = Matrix4::identity();
                 let uv_matrix = projection * view * mmatrix;

@@ -35,6 +35,9 @@ pub struct Model {
     pub translation: Vector3<f32>,
     pub rotation: Quaternion<f32>,
     pub scale: Vector3<f32>,
+
+    // TODO: hack
+    pub count: f32,
 }
 
 impl Component for Model {
@@ -47,6 +50,8 @@ impl Model {
             translation: Vector3::new(0.0, 0.0, 0.0),
             rotation: Quaternion::zero(),
             scale: Vector3::new(1.0, 1.0, 1.0),
+
+            count: 0.0,
         }
     }
 }
