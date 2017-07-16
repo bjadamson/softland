@@ -27,21 +27,41 @@ use specs::*;
 
 use shader;
 use state;
-use state::State;
+use state::{MouseState, State};
 use toml;
 
 pub type ColorFormat = gfx::format::Rgba8;
 pub type DepthFormat = gfx::format::DepthStencil;
 
-#[derive(Copy, Clone, PartialEq, Debug, Default)]
-struct MouseState {
-    pos: (i32, i32),
-    pressed: (bool, bool, bool),
-    wheel: f32,
+struct TestSystem;
+
+impl<'a> System<'a> for TestSystem {
+    type SystemData = WriteStorage<'a, state::Model>;
+
+    fn run(&mut self, mut model: Self::SystemData) {
+        for model in (&mut model).join() {
+            model.count += 1.0;
+            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.count));
+        }
+    }
+}
+
+struct UpdateMouseStateSystem;
+
+impl<'a> System<'a> for UpdateMouseStateSystem {
+    type SystemData = FetchMut<'a, state::State>;
+
+    fn run(&mut self, mut state: Self::SystemData) {
+        // println!("updating 'previous' mouse state.");
+
+        // for state in (&mut state).join() {
+        // state.mouse.prev = state.mouse.current;
+        // }
+    }
 }
 
 macro_rules! process_event {
-    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse_state:ident, $game_state:ident, $main_color:ident, $main_depth:ident) => (
+    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse:ident, $game_state:ident, $main_color:ident, $main_depth:ident) => (
         match $event {
             WindowEvent::Resized(_, _) => {
                 gfx_window_glutin::update_views(&$window, &mut $main_color, &mut $main_depth);
@@ -77,10 +97,7 @@ macro_rules! process_event {
                     Some(VirtualKeyCode::Delete) => $imgui.set_key(9, pressed),
                     Some(VirtualKeyCode::Back) => $imgui.set_key(10, pressed),
                     Some(VirtualKeyCode::Return) => {
-// 1. Tell imgui the key was pressed.
                         $imgui.set_key(11, pressed);
-
-// 2. Update our state w/regard to chat input.
                         $game_state.chat_window_state.user_editing = state == ElementState::Released;
                     },
                     Some(VirtualKeyCode::Escape) => $game_state.quit = true,
@@ -114,21 +131,24 @@ macro_rules! process_event {
                     _ => {}
                 }
             }
-            WindowEvent::MouseMoved(x, y) => $mouse_state.pos = (x, y),
+            WindowEvent::MouseMoved(x, y) => {
+                $game_state.player.camera.rotate_to((x, y), $mouse);
+                $mouse.pos = (x as f32, y as f32);
+            }
             WindowEvent::MouseInput(state, MouseButton::Left) => {
-                $mouse_state.pressed.0 = state == ElementState::Pressed
+                $mouse.pressed.0 = state == ElementState::Pressed
             }
             WindowEvent::MouseInput(state, MouseButton::Right) => {
-                $mouse_state.pressed.1 = state == ElementState::Pressed
+                $mouse.pressed.1 = state == ElementState::Pressed
             }
             WindowEvent::MouseInput(state, MouseButton::Middle) => {
-                $mouse_state.pressed.2 = state == ElementState::Pressed
+                $mouse.pressed.2 = state == ElementState::Pressed
             }
             WindowEvent::MouseWheel(MouseScrollDelta::LineDelta(_, y), TouchPhase::Moved) => {
-                $mouse_state.wheel = y
+                $mouse.wheel = y
             }
             WindowEvent::MouseWheel(MouseScrollDelta::PixelDelta(_, y), TouchPhase::Moved) => {
-                $mouse_state.wheel = y
+                $mouse.wheel = y
             }
             WindowEvent::ReceivedCharacter(c) => $imgui.add_input_character(c),
             _ => ()
@@ -177,23 +197,9 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
     (vertexes, indices)
 }
 
-struct TestSystem;
-
-impl<'a> System<'a> for TestSystem {
-    type SystemData = WriteStorage<'a, state::Model>;
-
-    fn run(&mut self, mut model: Self::SystemData) {
-        println!("TestSystem::run() fn here");
-        for model in (&mut model).join() {
-            model.count += 1.0;
-            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.count));
-        }
-    }
-}
-
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
-                                           state: State,
+                                           mut state: State,
                                            file_contents: &str,
                                            mut build_ui: F) {
     let mut imgui = ImGui::init();
@@ -252,22 +258,26 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     }
 
     let mut dispatcher = DispatcherBuilder::new()
-        .add(TestSystem, "TestSystem", &[])
+        .add(UpdateMouseStateSystem, "UpdateMouseStateSystem", &[])
+        .add(TestSystem, "TestSystem", &["UpdateMouseStateSystem"])
         .build();
 
     let mut last_frame = Instant::now();
-    let mut mouse_state = MouseState::default();
+    let mut mouse = MouseState::default();
 
     let mut clock = GameClock::new();
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
 
+    {
+        let (x, y) = (w / 2, h / 2);
+        state.mouse.pos = (x as f32, y as f32);
+        window.set_cursor_position(x as i32, y as i32).unwrap();
+    }
+
     loop {
         {
             let mut state = &mut *world.write_resource::<State>();
-            for m in world.read::<state::Model>().join() {
-                println!("main thread: {:?}", m);
-            }
             sim_time = clock.tick(&step::FixedStep::new(&counter));
             counter.tick(&sim_time);
             state.framerate = sim_time.instantaneous_frame_rate();
@@ -277,7 +287,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                imgui,
                                window,
                                renderer,
-                               mouse_state,
+                               mouse,
                                state,
                                main_color,
                                main_depth);
@@ -288,7 +298,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
             last_frame = now;
 
-            update_mouse(&mut imgui, &mut mouse_state);
+            update_mouse(&mut imgui, &mut mouse);
 
             // Draw our scene
             //
@@ -310,7 +320,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                                   color::YELLOW];
 
                 let view = state.player.camera.compute_view();
-                let angle = cgmath::Deg(sim_time.frame_number() as f32);
+                // let angle = cgmath::Deg(sim_time.frame_number() as f32);
 
                 // non-ui 2d stuffz
                 let projection = {
@@ -340,7 +350,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                   color::BLUE,
                                   color::PURPLE];
                     gpu.draw_cube(&cube_pso, &dimensions, &colors, uv_matrix);
-                    println!("drawing triangle from file: {:?}", model);
+                    // println!("drawing triangle from file: {:?}", model);
                 }
 
                 let mmatrix = Matrix4::identity();
@@ -397,6 +407,7 @@ fn configure_keys(imgui: &mut ImGui) {
 
 fn update_mouse(imgui: &mut ImGui, mouse_state: &mut MouseState) {
     let scale = imgui.display_framebuffer_scale();
+
     imgui.set_mouse_pos(mouse_state.pos.0 as f32 / scale.0,
                         mouse_state.pos.1 as f32 / scale.1);
     imgui.set_mouse_down(&[mouse_state.pressed.0,

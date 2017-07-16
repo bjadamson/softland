@@ -1,3 +1,4 @@
+use cgmath;
 use cgmath::*;
 use imgui::*;
 
@@ -14,10 +15,12 @@ pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
         let quit = &mut state.quit;
         let framerate = state.framerate;
         let position = state.player.camera.position();
+        let rotation = state.player.camera.rotation();
         show_main_menu(ui,
                        quit,
                        framerate,
                        position,
+                       rotation,
                        chat_window_state,
                        edit_field_option,
                        chat_history,
@@ -295,6 +298,7 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
                       quit: &mut bool,
                       framerate: f64,
                       position: Vector3<f32>,
+                      rotation: Quaternion<f32>,
                       chat_window_state: &mut ChatWindowState,
                       edit_field_option: &mut EditingFieldOption,
                       chat_history: &mut ChatHistory,
@@ -346,17 +350,30 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
                 .selected(&mut chat_window_state.save_settings)
                 .build();
         });
-        let pos = format!("Position: [{}, {}, {}]", position.x, position.y, position.z);
-        let pos = unsafe { ImString::from_string_unchecked(pos) };
-        ui.with_color_var(ImGuiCol::TextDisabled, color::BLACK, || {
-            ui.menu(&pos).enabled(false).build(|| {});
-        });
-
-        let fps = "Framerate: ".to_string() + &framerate.to_string();
-        let fps = unsafe { ImString::from_string_unchecked(fps) };
-        ui.with_color_var(ImGuiCol::TextDisabled, color::GREEN_YELLOW, || {
-            ui.menu(&fps).enabled(false).build(|| {});
-        });
+        {
+            let pos = format!("Position: [{}, {}, {}]", position.x, position.y, position.z);
+            let pos = unsafe { ImString::from_string_unchecked(pos) };
+            ui.with_color_var(ImGuiCol::TextDisabled, color::BLACK, || {
+                ui.menu(&pos).enabled(false).build(|| {});
+            });
+        }
+        {
+            let rot = Euler::from(rotation);
+            let rot = (Deg::from(rot.x), Deg::from(rot.y), Deg::from(rot.z));
+            let (x, y, z) = rot;
+            let fmt = format!("Rotation: [{}, {}, {}]", x.0, y.0, z.0);
+            let rotation = unsafe { ImString::from_string_unchecked(fmt) };
+            ui.with_color_var(ImGuiCol::TextDisabled, color::PINK, || {
+                ui.menu(&rotation).enabled(false).build(|| {});
+            });
+        }
+        {
+            let fps = "Framerate: ".to_string() + &framerate.to_string();
+            let fps = unsafe { ImString::from_string_unchecked(fps) };
+            ui.with_color_var(ImGuiCol::TextDisabled, color::GREEN_YELLOW, || {
+                ui.menu(&fps).enabled(false).build(|| {});
+            });
+        }
     });
 }
 

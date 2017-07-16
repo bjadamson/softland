@@ -5,6 +5,7 @@ use cgmath::*;
 use imgui::*;
 
 use specs::*;
+use std::default::Default;
 
 #[derive(Debug)]
 pub struct State {
@@ -18,6 +19,7 @@ pub struct State {
     pub window_dimensions: (u32, u32),
 
     pub player: Player,
+    pub mouse: MouseState,
 }
 
 impl Component for State {
@@ -91,4 +93,25 @@ pub enum EditingFieldOption {
     ChannelName(ChannelId, String),
     ChannelColorText(ChannelId),
     ChatHistoryViewAll,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct MouseSensitivity {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Default for MouseSensitivity {
+    fn default() -> MouseSensitivity {
+        MouseSensitivity { x: 0.01, y: 0.01 }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
+pub struct MouseState {
+    pub pos: (f32, f32),
+    pub pressed: (bool, bool, bool),
+    pub wheel: f32,
+
+    pub sensitivity: MouseSensitivity,
 }
