@@ -148,7 +148,7 @@ fn main() {
         },
     };
 
-    // state.player.camera.move_forward(5.0);
+    state.player.camera.move_backward(5.0);
     let contents = {
         let mut file = File::open("data/foo.txt").unwrap();
         let mut contents = String::new();

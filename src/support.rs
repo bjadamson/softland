@@ -269,11 +269,11 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
 
-    {
-        let (x, y) = (w / 2, h / 2);
-        state.mouse.pos = (x as f32, y as f32);
-        window.set_cursor_position(x as i32, y as i32).unwrap();
-    }
+    // {
+    // let (x, y) = (w / 2, h / 2);
+    // state.mouse.pos = (x as f32, y as f32);
+    // window.set_cursor_position(x as i32, y as i32).unwrap();
+    // }
 
     loop {
         {
