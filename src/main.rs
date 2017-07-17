@@ -131,20 +131,28 @@ fn main() {
         menu_color_buffer: Default::default(),
         menu_color_buffer_backup: Default::default(),
     };
-    let mut state = State {
-        ui_buffers: ui_buffers,
-        chat_history: ChatHistory::from_existing(&init_channels, chat_history_text, prune),
-        chat_button_pressed: ChannelId::new(0),
-        chat_window_state: chat_config,
-        editing_field: EditingFieldOption::NotEditing,
-        framerate: 0.0,
-        window_dimensions: (1024, 768),
-        quit: false,
+    let mut state = {
+        let s = 1.0;
+        let c = color::WHITE;
+        let ambient_color = [c[0] * s, c[1] * s, c[2] * s, 1.0];
+        State {
+            ui_buffers: ui_buffers,
+            chat_history: ChatHistory::from_existing(&init_channels, chat_history_text, prune),
+            chat_button_pressed: ChannelId::new(0),
+            chat_window_state: chat_config,
+            editing_field: EditingFieldOption::NotEditing,
+            framerate: 0.0,
+            window_dimensions: (1024, 768),
+            quit: false,
 
-        player: Player {
-            camera: Camera::new(),
-            move_speed: 0.2,
-        },
+            player: Player {
+                camera: Camera::new(),
+                move_speed: 0.2,
+            },
+
+            // level data
+            ambient_color: ambient_color,
+        }
     };
 
     state.player.camera.move_backward(5.0);

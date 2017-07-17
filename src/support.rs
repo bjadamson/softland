@@ -348,15 +348,19 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                     let mmatrix = tmatrix * rmatrix * smatrix;
                     let uv_matrix = projection * view * mmatrix;
 
-                    let colors = [color::BLACK,
+                    let colors = [color::RED,
                                   color::GREEN,
                                   color::BLUE,
                                   color::PURPLE,
-                                  color::BLACK,
+                                  color::RED,
                                   color::GREEN,
                                   color::BLUE,
                                   color::PURPLE];
-                    gpu.draw_cube(&cube_pso, &dimensions, &colors, uv_matrix);
+                    gpu.draw_cube(&cube_pso,
+                                  &dimensions,
+                                  &colors,
+                                  state.ambient_color,
+                                  uv_matrix);
                     // println!("drawing triangle from file: {:?}", model);
                 }
 
@@ -365,6 +369,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                 gpu.draw_triangle_from_vertices(&generated_pso,
                                                 &plane_vertices,
                                                 &plane_indices,
+                                                state.ambient_color,
                                                 uv_matrix);
             }
 

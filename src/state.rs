@@ -19,6 +19,9 @@ pub struct State {
     pub window_dimensions: (u32, u32),
 
     pub player: Player,
+
+    // level global data
+    pub ambient_color: [f32; 4],
 }
 
 impl Component for State {

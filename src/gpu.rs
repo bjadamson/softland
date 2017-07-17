@@ -12,40 +12,40 @@ fn construct_cube<'a>(dimensions: &'a (f32, f32, f32),
                       colors: &[[f32; 4]; 8])
                       -> ([Vertex; 8], &'a [u16]) {
     let vertices = shape::make_cube_vertices(dimensions);
-    let a = Vertex {
-        pos: [vertices[2][0], vertices[2][1], vertices[2][2], vertices[2][3]],
+    let v0 = Vertex {
+        pos: [vertices[0][0], vertices[0][1], vertices[0][2], vertices[0][3]],
         color: colors[0],
     };
-    let b = Vertex {
-        pos: [vertices[3][0], vertices[3][1], vertices[3][2], vertices[3][3]],
+    let v1 = Vertex {
+        pos: [vertices[1][0], vertices[1][1], vertices[1][2], vertices[1][3]],
         color: colors[1],
     };
-    let c = Vertex {
-        pos: [vertices[6][0], vertices[6][1], vertices[6][2], vertices[6][3]],
+    let v2 = Vertex {
+        pos: [vertices[2][0], vertices[2][1], vertices[2][2], vertices[2][3]],
         color: colors[2],
     };
-    let d = Vertex {
-        pos: [vertices[7][0], vertices[7][1], vertices[7][2], vertices[7][3]],
+    let v3 = Vertex {
+        pos: [vertices[3][0], vertices[3][1], vertices[3][2], vertices[3][3]],
         color: colors[3],
     };
-    let e = Vertex {
-        pos: [vertices[1][0], vertices[1][1], vertices[1][2], vertices[1][3]],
+    let v4 = Vertex {
+        pos: [vertices[4][0], vertices[4][1], vertices[4][2], vertices[4][3]],
         color: colors[4],
     };
-    let f = Vertex {
-        pos: [vertices[0][0], vertices[0][1], vertices[0][2], vertices[0][3]],
+    let v5 = Vertex {
+        pos: [vertices[5][0], vertices[5][1], vertices[5][2], vertices[5][3]],
         color: colors[5],
     };
-    let g = Vertex {
-        pos: [vertices[4][0], vertices[4][1], vertices[4][2], vertices[4][3]],
+    let v6 = Vertex {
+        pos: [vertices[6][0], vertices[6][1], vertices[6][2], vertices[6][3]],
         color: colors[6],
     };
-    let h = Vertex {
-        pos: [vertices[5][0], vertices[5][1], vertices[5][2], vertices[5][3]],
+    let v7 = Vertex {
+        pos: [vertices[7][0], vertices[7][1], vertices[7][2], vertices[7][3]],
         color: colors[7],
     };
     const INDICES: &[u16] = &[3, 2, 6, 7, 4, 2, 0, 3, 1, 6, 5, 4, 1, 0];
-    ([a, b, c, d, e, f, g, h], &INDICES)
+    ([v2, v3, v6, v7, v1, v0, v4, v5], &INDICES)
 }
 
 fn make_triangle2d(length: f32, colors: &[[f32; 4]; 3]) -> [Vertex; 3] {
@@ -110,16 +110,18 @@ impl<'a, R, F> PsoFactory<'a, R, F>
 }
 
 macro_rules! copy_vertices {
-    ($factory:ident, $encoder:ident, $out_color:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
+    ($factory:ident, $encoder:ident, $ambient:ident, $out_color:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
         let (vertex_buffer, slice) = $factory.create_vertex_buffer_with_slice(&$vertices, $indices);
         let data = pipe::Data {
             vbuf: vertex_buffer,
             locals: $factory.create_constant_buffer(1),
             model: $model_m.into(),
+            ambient: $ambient,
             out: $out_color.clone()
         };
         let locals = Locals {
-            model: data.model
+            model: data.model,
+            ambient: data.ambient,
         };
         $encoder.update_buffer(&data.locals, &[locals], 0).unwrap();
         $encoder.draw(&slice, &$pso, &data);
@@ -156,6 +158,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                      pso: &gfx::PipelineState<R, pipe::Meta>,
                      dimensions: &(f32, f32, f32),
                      colors: &[[f32; 4]; 8],
+                     ambient: [f32; 4],
                      model_m: Matrix4<f32>) {
         let (vertices, indices) = construct_cube(dimensions, &colors);
 
@@ -163,13 +166,21 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
 
-        copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
+        copy_vertices!(factory,
+                       encoder,
+                       ambient,
+                       out_color,
+                       pso,
+                       model_m,
+                       vertices,
+                       indices)
     }
 
     pub fn draw_triangle(&mut self,
                          pso: &gfx::PipelineState<R, pipe::Meta>,
                          radius: f32,
                          colors: &[[f32; 4]; 3],
+                         ambient: [f32; 4],
                          model_m: Matrix4<f32>) {
         let vertices = make_triangle2d(radius, &colors);
         let indices = ();
@@ -178,18 +189,33 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
 
-        copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
+        copy_vertices!(factory,
+                       encoder,
+                       ambient,
+                       out_color,
+                       pso,
+                       model_m,
+                       vertices,
+                       indices)
     }
 
     pub fn draw_triangle_from_vertices(&mut self,
                                        pso: &gfx::PipelineState<R, pipe::Meta>,
                                        vertices: &[shader::Vertex],
                                        indices: &[u32],
+                                       ambient: [f32; 4],
                                        model_m: Matrix4<f32>) {
         let factory = &mut self.factory;
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
 
-        copy_vertices!(factory, encoder, out_color, pso, model_m, vertices, indices)
+        copy_vertices!(factory,
+                       encoder,
+                       ambient,
+                       out_color,
+                       pso,
+                       model_m,
+                       vertices,
+                       indices)
     }
 }
