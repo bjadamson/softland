@@ -108,9 +108,16 @@ impl Default for MouseSensitivity {
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct MouseState {
-    pub pos: (f32, f32),
     pub pressed: (bool, bool, bool),
     pub wheel: f32,
 
     pub sensitivity: MouseSensitivity,
+
+    // Initially, until the user moves the cursor, the cursor's position is unknown. It seems
+    // impossible to query using the available API's.
+    //
+    // So this field is an optional, allowing us to hack around the fact we can't ask the window
+    // where the cursor is located, allowing us to key off of whether or not we've moved the mouse
+    // atleast once.
+    pub cursor_pos: Option<(f32, f32)>,
 }

@@ -27,7 +27,7 @@ use specs::*;
 
 use shader;
 use state;
-use state::{MouseState, State};
+use state::*;
 use toml;
 
 pub type ColorFormat = gfx::format::Rgba8;
@@ -132,8 +132,15 @@ macro_rules! process_event {
                 }
             }
             WindowEvent::MouseMoved(x, y) => {
-                $game_state.player.camera.rotate_to((x, y), $mouse);
-                $mouse.pos = (x as f32, y as f32);
+                let (x, y) = (x as f32, y as f32);
+                if $mouse.cursor_pos.is_none() {
+                    let pos = (x, y);
+                    $mouse.cursor_pos = Some(pos);
+                } else {
+                    let pos = $mouse.cursor_pos.unwrap();
+                    $game_state.player.camera.rotate_to((x, y), pos, $mouse.sensitivity);
+                }
+                $mouse.cursor_pos = Some((x, y));
             }
             WindowEvent::MouseInput(state, MouseButton::Left) => {
                 $mouse.pressed.0 = state == ElementState::Pressed
@@ -408,8 +415,11 @@ fn configure_keys(imgui: &mut ImGui) {
 fn update_mouse(imgui: &mut ImGui, mouse_state: &mut MouseState) {
     let scale = imgui.display_framebuffer_scale();
 
-    imgui.set_mouse_pos(mouse_state.pos.0 as f32 / scale.0,
-                        mouse_state.pos.1 as f32 / scale.1);
+    if mouse_state.cursor_pos.is_none() {
+        return;
+    }
+    let pos = mouse_state.cursor_pos.unwrap();
+    imgui.set_mouse_pos(pos.0 as f32 / scale.0, pos.1 as f32 / scale.1);
     imgui.set_mouse_down(&[mouse_state.pressed.0,
                            mouse_state.pressed.1,
                            mouse_state.pressed.2,

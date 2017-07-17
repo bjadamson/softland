@@ -1,7 +1,7 @@
 use cgmath;
 use cgmath::*;
 use state;
-use state::MouseState;
+use state::{MouseState, MouseSensitivity};
 
 type Vec3 = Vector3<f32>;
 type Vec4 = Vector4<f32>;
@@ -99,35 +99,21 @@ impl Camera {
         self.move_dir(s, &Vector3::new(0.0, 1.0, 0.0));
     }
 
-    pub fn rotate_to(&mut self, (xnew, ynew): (i32, i32), mouse: MouseState) -> &mut Self {
+    pub fn rotate_to(&mut self,
+                     (xnew, ynew): (f32, f32),
+                     cursor_pos: (f32, f32),
+                     sensitivity: MouseSensitivity)
+                     -> &mut Self {
         let delta: Vector2<f32> = {
-            let (xnew, ynew) = (xnew as f32, ynew as f32);
-            let (x, y) = mouse.pos;
+            let (xnew, ynew) = (xnew, ynew);
+            let (x, y) = cursor_pos;
             let (xpos, ypos) = (xnew - x, ynew - y);
             Vector2::new(xpos, ypos)
         };
 
-        let mouse_sens = mouse.sensitivity;
-        let yaw = mouse_sens.x * delta.x;
-        let pitch = mouse_sens.y * delta.y;
+        let yaw = sensitivity.x * delta.x;
+        let pitch = sensitivity.y * delta.y;
         let roll = self.roll;
-
-        // let (move_y, move_x) = current.movement;
-        // let moving_down = move_y == MouseUpDown;//current.yrel >= 0;
-        // let moving_up = !moving_down;
-        // let moving_up = current.yrel <= 0;
-
-        // let new_pitch = Deg(self.pitch + pitch);
-        // if mdata.pitch_lock {
-        // if new_pitch > 0.0 && moving_down {
-        // println!("DOWN LOCK");
-        // return self;
-        // }
-        // if new_pitch < -45.0 && moving_up {
-        // println!("UP LOCK");
-        // return self;
-        // }
-        // }
 
         self.yaw += yaw;
         self.pitch += pitch;
