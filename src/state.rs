@@ -19,7 +19,6 @@ pub struct State {
     pub window_dimensions: (u32, u32),
 
     pub player: Player,
-    pub mouse: MouseState,
 }
 
 impl Component for State {

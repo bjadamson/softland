@@ -138,7 +138,6 @@ fn main() {
         chat_window_state: chat_config,
         editing_field: EditingFieldOption::NotEditing,
         framerate: 0.0,
-        mouse: state::MouseState::default(),
         window_dimensions: (1024, 768),
         quit: false,
 
