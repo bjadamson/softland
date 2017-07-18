@@ -378,13 +378,20 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
 }
 
 fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
-    let window_rounding = StyleVar::WindowRounding(state.chat_window_state.window_rounding);
+    let styles = {
+        let padding = StyleVar::WindowPadding(ImVec2::new(5.0, 0.0));
+        let rounding = StyleVar::WindowRounding(state.chat_window_state.window_rounding);
+
+        // How much space between chat messages, etc...
+        let item_spacing = StyleVar::ItemSpacing((5.0, 5.0).into());
+        &[padding, rounding, item_spacing]
+    };
     let (chat_w, chat_h) = state.chat_window_state.dimensions;
     let (chat_w, chat_h) = (chat_w as f32, chat_h as f32);
     let window_pos = state.chat_window_state.pos;
     // let button_height = state.button_padding;
 
-    ui.with_style_var(window_rounding, || {
+    ui.with_style_vars(styles, || {
         ui.window(im_str!("ChatWindow"))
             .position(window_pos, ImGuiSetCond_FirstUseEver)
             .size((chat_w, chat_h), ImGuiSetCond_FirstUseEver)
