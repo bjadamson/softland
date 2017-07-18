@@ -277,8 +277,6 @@ fn create_view_all_chat_history<'a>(ui: &Ui<'a>,
 }
 
 fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
-    // let quit = &mut state.quit;
-
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
             ui.menu_item(im_str!("Exit")).selected(&mut state.quit).build();

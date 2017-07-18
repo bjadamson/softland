@@ -121,12 +121,15 @@ impl<'a, R, F> PsoFactory<'a, R, F>
 }
 
 macro_rules! copy_vertices {
-    ($factory:ident, $encoder:ident, $ambient:ident, $light_color:ident, $light_pos:ident, $out_color:ident, $depth:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
+    ($factory:ident, $encoder:ident, $ambient:ident, $light_color:ident, $light_pos:ident,
+     $out_color:ident, $depth:ident, $pso:ident, $model_m:ident, $viewpos:ident, $vertices:ident,
+     $indices:ident) => {{
         let (vertex_buffer, slice) = $factory.create_vertex_buffer_with_slice(&$vertices, $indices);
         let data = pipe::Data {
             vbuf: vertex_buffer,
             locals: $factory.create_constant_buffer(1),
             model: $model_m.into(),
+            viewpos: $viewpos.into(),
             ambient: $ambient,
             lightcolor: $light_color,
             lightpos: $light_pos,
@@ -135,6 +138,7 @@ macro_rules! copy_vertices {
         };
         let locals = Locals {
             model: data.model,
+            viewpos: data.viewpos,
             ambient: data.ambient,
             lightcolor: data.lightcolor,
             lightpos: data.lightpos,
@@ -180,7 +184,8 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                      ambient: [f32; 4],
                      lightcolor: [f32; 4],
                      lightpos: [f32; 3],
-                     model_m: Matrix4<f32>) {
+                     model_m: Matrix4<f32>,
+                     viewpos: Vector3<f32>) {
         let (vertices, indices) = construct_cube(dimensions, &colors);
 
         let factory = &mut self.factory;
@@ -197,6 +202,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                        main_depth,
                        pso,
                        model_m,
+                       viewpos,
                        vertices,
                        indices)
     }
@@ -208,7 +214,8 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                          ambient: [f32; 4],
                          lightcolor: [f32; 4],
                          lightpos: [f32; 3],
-                         model_m: Matrix4<f32>) {
+                         model_m: Matrix4<f32>,
+                         viewpos: Vector3<f32>) {
         let vertices = make_triangle2d(radius, &colors);
         let indices = ();
 
@@ -226,6 +233,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                        main_depth,
                        pso,
                        model_m,
+                       viewpos,
                        vertices,
                        indices)
     }
@@ -237,7 +245,8 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                                        ambient: [f32; 4],
                                        lightcolor: [f32; 4],
                                        lightpos: [f32; 3],
-                                       model_m: Matrix4<f32>) {
+                                       model_m: Matrix4<f32>,
+                                       viewpos: Vector3<f32>) {
         let factory = &mut self.factory;
         let encoder = &mut self.encoder;
         let out_color = &mut self.out_color;
@@ -252,6 +261,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                        main_depth,
                        pso,
                        model_m,
+                       viewpos,
                        vertices,
                        indices)
     }

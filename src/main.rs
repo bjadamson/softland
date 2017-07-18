@@ -46,8 +46,6 @@ mod state;
 mod support;
 mod ui;
 
-const CLEAR_COLOR: [f32; 4] = [0.28, 0.38, 0.549, 0.7];
-
 fn main() {
     let chat_config = ChatWindowState {
         dimensions: (480.0, 200.0),
@@ -136,7 +134,7 @@ fn main() {
         let c = color::WHITE;
         let ambient_color = [c[0] * s, c[1] * s, c[2] * s, c[3]];
 
-        let diffuse_color = [1.0, 0.0, 0.0, 1.0];
+        let diffuse_color = [0.0, 0.0, 0.6, 0.8];
         let diffuse_color_pos = [0.0, 0.0, 0.0];
 
         State {
@@ -170,5 +168,6 @@ fn main() {
         contents
     };
 
-    support::run_game("Softland", CLEAR_COLOR, state, &contents, ui::render_ui);
+    let clear_color: [f32; 4] = color::WHITE;
+    support::run_game("Softland", clear_color, state, &contents, ui::render_ui);
 }

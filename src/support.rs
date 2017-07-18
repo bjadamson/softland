@@ -371,16 +371,19 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                   color::PINK,
                                   color::RED,
                                   color::YELLOW];
+                    let view = model.translation;
                     gpu.draw_cube(&cube_pso,
                                   &dimensions,
                                   &colors,
                                   state.ambient_color,
                                   state.diffuse_color.into(),
                                   state.diffuse_color_pos.into(),
-                                  uv_matrix);
+                                  uv_matrix,
+                                  view);
                     // println!("drawing triangle from file: {:?}", model);
                 }
 
+                /*
                 let mmatrix = Matrix4::identity();
                 let uv_matrix = projection * view * mmatrix;
                 gpu.draw_triangle_from_vertices(&generated_pso,
@@ -389,7 +392,9 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                                 state.ambient_color,
                                                 state.diffuse_color.into(),
                                                 state.diffuse_color_pos.into(),
-                                                uv_matrix);
+                                                uv_matrix,
+                                                model.translation);
+                */
             }
 
             // 3. Construct our UI.
