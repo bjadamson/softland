@@ -30,9 +30,6 @@ use state;
 use state::*;
 use toml;
 
-pub type ColorFormat = gfx::format::Rgba8;
-pub type DepthFormat = gfx::format::DepthStencil;
-
 struct TestSystem;
 
 impl<'a> System<'a> for TestSystem {
@@ -218,7 +215,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
         .with_dimensions(w, h)
         .with_vsync();
     let (window, mut device, mut factory, mut main_color, mut main_depth) =
-        gfx_window_glutin::init::<ColorFormat, DepthFormat>(builder, &events_loop);
+        gfx_window_glutin::init::<shader::ColorFormat, shader::DepthFormat>(builder, &events_loop);
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
     let mut renderer = Renderer::init(&mut imgui, &mut factory, main_color.clone())
         .expect("Failed to initialize renderer");
@@ -232,7 +229,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let (triangle_pso, cube_pso, generated_pso) = {
         let mut pso_factory = gpu::PsoFactory::new(&mut factory);
         let triangle_pso = pso_factory.triangle_list();
-        let cube_pso = pso_factory.triangle_strip();
+        let cube_pso = pso_factory.triangle_list();
         let generated_pso = pso_factory.triangle_list();
         (triangle_pso, cube_pso, generated_pso)
     };
@@ -311,10 +308,12 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             //
             // 1. Clear the background.
             encoder.clear(&mut main_color, clear_color);
+            encoder.clear_depth(&mut main_depth, 1.0);
 
             // 2. Submit geometry to GPU.
             {
-                let mut gpu = gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color);
+                let mut gpu =
+                    gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color, &mut main_depth);
 
                 let dimensions = (0.25, 0.25, 0.25);
                 let rect_colors: [[f32; 4]; 8] = [color::RED,
@@ -348,14 +347,12 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                     let mmatrix = tmatrix * rmatrix * smatrix;
                     let uv_matrix = projection * view * mmatrix;
 
-                    let colors = [color::RED,
+                    let colors = [color::WHITE,
                                   color::GREEN,
                                   color::BLUE,
-                                  color::PURPLE,
+                                  color::PINK,
                                   color::RED,
-                                  color::GREEN,
-                                  color::BLUE,
-                                  color::PURPLE];
+                                  color::YELLOW];
                     gpu.draw_cube(&cube_pso,
                                   &dimensions,
                                   &colors,

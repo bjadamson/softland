@@ -46,7 +46,7 @@ mod state;
 mod support;
 mod ui;
 
-const CLEAR_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+const CLEAR_COLOR: [f32; 4] = [0.28, 0.38, 0.549, 0.7];
 
 fn main() {
     let chat_config = ChatWindowState {

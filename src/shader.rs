@@ -1,5 +1,14 @@
 use gfx;
 
+pub type ColorFormat = gfx::format::Rgba8;
+pub type DepthFormat = gfx::format::DepthStencil;
+
+pub type OutColor<R: gfx::Resources> = gfx::handle::RenderTargetView<R,
+                                                                     (gfx::format::R8_G8_B8_A8,
+                                                                      gfx::format::Unorm)>;
+pub type OutDepth<R: gfx::Resources> = gfx::handle::DepthStencilView<R, DepthFormat>;
+
+
 gfx_defines!{
     vertex Vertex {
         pos: [f32; 4] = "a_pos",
@@ -16,7 +25,11 @@ gfx_defines!{
         locals: gfx::ConstantBuffer<Locals> = "Locals",
         model: gfx::Global<[[f32; 4]; 4]> = "u_model",
         ambient: gfx::Global<[f32; 4]> = "u_ambient",
-        out: gfx::RenderTarget<gfx::format::Rgba8> = "target_0",
+        out: gfx::RenderTarget<ColorFormat> = "target_0",
+        depth: gfx::DepthTarget<DepthFormat> = gfx::state::Depth {
+            fun: gfx::state::Comparison::Less,
+            write: true,
+        },
     }
 }
 
