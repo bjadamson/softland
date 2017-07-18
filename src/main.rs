@@ -134,7 +134,7 @@ fn main() {
         let c = color::WHITE;
         let ambient_color = [c[0] * s, c[1] * s, c[2] * s, c[3]];
 
-        let diffuse_color = [0.0, 0.0, 0.6, 0.8];
+        let diffuse_color = [0.0, 0.0, 1.0, 0.9];
         let diffuse_color_pos = [0.0, 0.0, 0.0];
 
         State {
@@ -168,6 +168,6 @@ fn main() {
         contents
     };
 
-    let clear_color: [f32; 4] = color::WHITE;
+    let clear_color: [f32; 4] = color::BLACK;
     support::run_game("Softland", clear_color, state, &contents, ui::render_ui);
 }

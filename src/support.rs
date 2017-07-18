@@ -204,8 +204,7 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
             shader::Vertex {
                 pos: pos,
                 color: calculate_color(value),
-                // TODO: use calculated normals?
-                normal: [0.0, 0.0, 0.0],
+                normal: v.normal,
             }
         })
         .collect();
@@ -366,11 +365,11 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                     let uv_matrix = projection * view * mmatrix;
 
                     let colors = [color::WHITE,
-                                  color::GREEN,
-                                  color::BLUE,
                                   color::PINK,
-                                  color::RED,
-                                  color::YELLOW];
+                                  color::WHITE,
+                                  color::PINK,
+                                  color::WHITE,
+                                  color::PINK];
                     let view = model.translation;
                     gpu.draw_cube(&cube_pso,
                                   &dimensions,
@@ -383,9 +382,9 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                     // println!("drawing triangle from file: {:?}", model);
                 }
 
-                /*
                 let mmatrix = Matrix4::identity();
                 let uv_matrix = projection * view * mmatrix;
+                let viewpos = Vector3::new(0.0, 0.0, 0.0);
                 gpu.draw_triangle_from_vertices(&generated_pso,
                                                 &plane_vertices,
                                                 &plane_indices,
@@ -393,8 +392,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                                 state.diffuse_color.into(),
                                                 state.diffuse_color_pos.into(),
                                                 uv_matrix,
-                                                model.translation);
-                */
+                                                viewpos);
             }
 
             // 3. Construct our UI.
