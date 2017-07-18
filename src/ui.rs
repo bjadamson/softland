@@ -7,43 +7,25 @@ use chat_history::{ChannelId, ChatHistory};
 use state::*;
 
 pub fn render_ui<'a>(ui: &Ui<'a>, state: &mut State) {
-    {
-        let chat_history = &mut state.chat_history;
-        let chat_window_state = &mut state.chat_window_state;
-        let ui_buffers = &mut state.ui_buffers;
-        let edit_field_option = &mut state.editing_field;
-        let quit = &mut state.quit;
-        let framerate = state.framerate;
-        let position = state.player.camera.position();
-        let rotation = state.player.camera.rotation();
-        show_main_menu(ui,
-                       quit,
-                       framerate,
-                       position,
-                       rotation,
-                       chat_window_state,
-                       edit_field_option,
-                       chat_history,
-                       ui_buffers);
-    }
+    show_main_menu(ui, state);
     set_chat_window_pos(state);
     show_chat_window(ui, state);
 
     let chat_history = &mut state.chat_history;
     let ui_buffers = &mut state.ui_buffers;
-    let edit_field_option = &mut state.editing_field;
-    match edit_field_option.clone() {
+    let edit_chat_field = &mut state.edit_chat_field;
+    match edit_chat_field.clone() {
         EditingFieldOption::ChannelName(id, name) => {
-            create_rename_chat_channel(&ui, id, &name, edit_field_option, chat_history, ui_buffers);
+            create_rename_chat_channel(&ui, id, &name, edit_chat_field, chat_history, ui_buffers);
         }
         EditingFieldOption::ChannelColorText(id) => {
-            create_set_channel_text_color(&ui, id, edit_field_option, chat_history, ui_buffers);
+            create_set_channel_text_color(&ui, id, edit_chat_field, chat_history, ui_buffers);
         }
         EditingFieldOption::ChatHistoryMaximumLength => {
-            create_set_maximum_chat_history(&ui, edit_field_option, chat_history, ui_buffers);
+            create_set_maximum_chat_history(&ui, edit_chat_field, chat_history, ui_buffers);
         }
         EditingFieldOption::ChatHistoryViewAll => {
-            create_view_all_chat_history(&ui, edit_field_option, chat_history);
+            create_view_all_chat_history(&ui, edit_chat_field, chat_history);
         }
         EditingFieldOption::NotEditing => {}
     };
@@ -112,7 +94,7 @@ fn add_chat_button<'a>(text: &ImStr,
 fn create_rename_chat_channel<'a>(ui: &Ui<'a>,
                                   id: ChannelId,
                                   channel_name: &str,
-                                  edit_field_option: &mut EditingFieldOption,
+                                  edit_chat_field_option: &mut EditingFieldOption,
                                   chat_history: &mut ChatHistory,
                                   ui_buffers: &mut UiBuffers) {
     ui.window(im_str!("Rename Channel"))
@@ -159,7 +141,7 @@ fn create_rename_chat_channel<'a>(ui: &Ui<'a>,
             }
 
             if button_was_pressed {
-                *edit_field_option = EditingFieldOption::NotEditing;
+                *edit_chat_field_option = EditingFieldOption::NotEditing;
                 ui_buffers.menu_input_buffer.clear();
             }
         });
@@ -167,7 +149,7 @@ fn create_rename_chat_channel<'a>(ui: &Ui<'a>,
 
 fn create_set_channel_text_color<'a>(ui: &Ui<'a>,
                                      id: ChannelId,
-                                     edit_field_option: &mut EditingFieldOption,
+                                     edit_chat_field_option: &mut EditingFieldOption,
                                      chat_history: &mut ChatHistory,
                                      ui_buffers: &mut UiBuffers) {
     let (mut ok_pressed, mut cancel_pressed) = Default::default();
@@ -205,13 +187,13 @@ fn create_set_channel_text_color<'a>(ui: &Ui<'a>,
             ui_buffers.menu_color_buffer = ui_buffers.menu_color_buffer_backup;
         }
         if cancel_pressed || ok_pressed {
-            *edit_field_option = EditingFieldOption::NotEditing;
+            *edit_chat_field_option = EditingFieldOption::NotEditing;
         }
     };
 }
 
 fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>,
-                                       edit_field_option: &mut EditingFieldOption,
+                                       edit_chat_field_option: &mut EditingFieldOption,
                                        chat_history: &mut ChatHistory,
                                        ui_buffers: &mut UiBuffers) {
     ui.window(im_str!("History Length"))
@@ -261,7 +243,7 @@ fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>,
             }
 
             if cancel_pressed || ok_pressed {
-                *edit_field_option = EditingFieldOption::NotEditing;
+                *edit_chat_field_option = EditingFieldOption::NotEditing;
             }
 
             // restrict values to the positive domain of i32
@@ -270,7 +252,7 @@ fn create_set_maximum_chat_history<'a>(ui: &Ui<'a>,
 }
 
 fn create_view_all_chat_history<'a>(ui: &Ui<'a>,
-                                    edit_field_option: &mut EditingFieldOption,
+                                    edit_chat_field_option: &mut EditingFieldOption,
                                     chat_history: &mut ChatHistory) {
     ui.window(im_str!("Examine Chat"))
             .position((100.0, 100.0), ImGuiSetCond_FirstUseEver)
@@ -289,38 +271,35 @@ fn create_view_all_chat_history<'a>(ui: &Ui<'a>,
                     });
                 let button_size = (100.0, 20.0);
                 if ui.button(im_str!("Done"), button_size) {
-                    *edit_field_option = EditingFieldOption::NotEditing;
+                    *edit_chat_field_option = EditingFieldOption::NotEditing;
                 }
             });
 }
 
-fn show_main_menu<'a>(ui: &Ui<'a>,
-                      quit: &mut bool,
-                      framerate: f64,
-                      position: Vector3<f32>,
-                      rotation: Quaternion<f32>,
-                      chat_window_state: &mut ChatWindowState,
-                      edit_field_option: &mut EditingFieldOption,
-                      chat_history: &mut ChatHistory,
-                      ui_buffers: &mut UiBuffers) {
+fn show_main_menu<'a>(ui: &Ui<'a>, state: &mut State) {
+    // let quit = &mut state.quit;
+
     ui.main_menu_bar(|| {
         ui.menu(im_str!("Menu")).build(|| {
-            ui.menu_item(im_str!("Exit")).selected(quit).build();
+            ui.menu_item(im_str!("Exit")).selected(&mut state.quit).build();
         });
         ui.menu(im_str!("Options")).build(|| {
             ui.menu_item(im_str!("...")).build();
         });
         ui.menu(im_str!("Chat")).build(|| {
+            let edit_chat_field = &mut state.edit_chat_field;
             if ui.menu_item(im_str!("View All")).build() {
-                *edit_field_option = EditingFieldOption::ChatHistoryViewAll;
+                *edit_chat_field = EditingFieldOption::ChatHistoryViewAll;
             }
+            let chat_history = &mut state.chat_history;
+            let ui_buffers = &mut state.ui_buffers;
             for (idx, &(ref channel_name, _)) in chat_history.channel_names().iter().enumerate() {
                 let cn = unsafe { ImString::from_string_unchecked(channel_name.clone()) };
                 ui.menu(&cn).build(|| {
                     let channel_id = ChannelId::new(idx);
                     if ui.menu_item(im_str!("Name")).build() {
-                        *edit_field_option =
-                            EditingFieldOption::ChannelName(channel_id, channel_name.to_owned());
+                        *edit_chat_field = EditingFieldOption::ChannelName(channel_id,
+                                                                           channel_name.to_owned());
                     }
                     if ui.menu_item(im_str!("Color")).build() {
                         if let Some(channel) =
@@ -328,7 +307,7 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
                             ui_buffers.menu_color_buffer = channel.text_color;
                             // Store the color currently in the buffer for later.
                             ui_buffers.menu_color_buffer_backup = ui_buffers.menu_color_buffer;
-                            *edit_field_option = EditingFieldOption::ChannelColorText(channel_id);
+                            *edit_chat_field = EditingFieldOption::ChannelColorText(channel_id);
                         };
                     }
                     ui.menu_item(im_str!("Font")).build();
@@ -338,8 +317,9 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
                 let prune = chat_history.get_prune();
                 ui_buffers.menu_int_buffer_backup = prune.length;
                 ui_buffers.menu_bool_buffer_backup = prune.enabled;
-                *edit_field_option = EditingFieldOption::ChatHistoryMaximumLength;
+                *edit_chat_field = EditingFieldOption::ChatHistoryMaximumLength;
             }
+            let chat_window_state = &mut state.chat_window_state;
             ui.menu_item(im_str!("Movable"))
                 .selected(&mut chat_window_state.movable)
                 .build();
@@ -349,6 +329,28 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
             ui.menu_item(im_str!("Save Settings"))
                 .selected(&mut chat_window_state.save_settings)
                 .build();
+        });
+
+        let position = state.player.camera.position();
+        let rotation = state.player.camera.rotation();
+        ui.menu(im_str!("Diffuse Light")).build(|| {
+            {
+                let pos = format!("Position: [{}, {}, {}]",
+                                  state.diffuse_color_pos[0],
+                                  state.diffuse_color_pos[1],
+                                  state.diffuse_color_pos[2]);
+                let position = unsafe { ImString::from_string_unchecked(pos) };
+                ui.menu_item(&position).build();
+            }
+            {
+                let c = format!("Color: [{}, {}, {}, {}]",
+                                state.diffuse_color[0],
+                                state.diffuse_color[1],
+                                state.diffuse_color[2],
+                                state.diffuse_color[3]);
+                let color = unsafe { ImString::from_string_unchecked(c) };
+                ui.menu_item(&color).build();
+            }
         });
         {
             let pos = format!("Position: [{}, {}, {}]", position.x, position.y, position.z);
@@ -368,6 +370,7 @@ fn show_main_menu<'a>(ui: &Ui<'a>,
             });
         }
         {
+            let framerate = state.framerate;
             let fps = "Framerate: ".to_string() + &framerate.to_string();
             let fps = unsafe { ImString::from_string_unchecked(fps) };
             ui.with_color_var(ImGuiCol::TextDisabled, color::GREEN_YELLOW, || {

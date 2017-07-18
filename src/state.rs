@@ -13,7 +13,7 @@ pub struct State {
     pub chat_window_state: ChatWindowState,
     pub chat_history: ChatHistory,
     pub chat_button_pressed: ChannelId,
-    pub editing_field: EditingFieldOption,
+    pub edit_chat_field: EditingFieldOption,
     pub framerate: f64,
     pub quit: bool,
     pub window_dimensions: (u32, u32),
@@ -22,7 +22,9 @@ pub struct State {
 
     // level global data
     pub ambient_color: [f32; 4],
-    pub diffuse_color_light_pos: [f32; 3],
+
+    pub diffuse_color: [f32; 4],
+    pub diffuse_color_pos: [f32; 3],
 }
 
 impl Component for State {

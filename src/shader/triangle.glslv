@@ -11,6 +11,7 @@ out vec3 v_normal;
 uniform Locals {
   mat4 u_model;
   vec4 u_ambient;
+  vec4 u_lightcolor;
   vec3 u_lightpos;
 };
 

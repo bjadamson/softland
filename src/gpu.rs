@@ -121,13 +121,14 @@ impl<'a, R, F> PsoFactory<'a, R, F>
 }
 
 macro_rules! copy_vertices {
-    ($factory:ident, $encoder:ident, $ambient:ident, $light_pos:ident, $out_color:ident, $depth:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
+    ($factory:ident, $encoder:ident, $ambient:ident, $light_color:ident, $light_pos:ident, $out_color:ident, $depth:ident, $pso:ident, $model_m:ident, $vertices:ident, $indices:ident) => {{
         let (vertex_buffer, slice) = $factory.create_vertex_buffer_with_slice(&$vertices, $indices);
         let data = pipe::Data {
             vbuf: vertex_buffer,
             locals: $factory.create_constant_buffer(1),
             model: $model_m.into(),
             ambient: $ambient,
+            lightcolor: $light_color,
             lightpos: $light_pos,
             out: $out_color.clone(),
             depth: $depth.clone(),
@@ -135,7 +136,8 @@ macro_rules! copy_vertices {
         let locals = Locals {
             model: data.model,
             ambient: data.ambient,
-            lightpos: data.lightpos
+            lightcolor: data.lightcolor,
+            lightpos: data.lightpos,
         };
         $encoder.update_buffer(&data.locals, &[locals], 0).unwrap();
         $encoder.draw(&slice, &$pso, &data);
@@ -176,6 +178,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                      dimensions: &(f32, f32, f32),
                      colors: &[[f32; 4]; 6],
                      ambient: [f32; 4],
+                     lightcolor: [f32; 4],
                      lightpos: [f32; 3],
                      model_m: Matrix4<f32>) {
         let (vertices, indices) = construct_cube(dimensions, &colors);
@@ -188,6 +191,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
         copy_vertices!(factory,
                        encoder,
                        ambient,
+                       lightcolor,
                        lightpos,
                        out_color,
                        main_depth,
@@ -202,6 +206,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                          radius: f32,
                          colors: &[[f32; 4]; 3],
                          ambient: [f32; 4],
+                         lightcolor: [f32; 4],
                          lightpos: [f32; 3],
                          model_m: Matrix4<f32>) {
         let vertices = make_triangle2d(radius, &colors);
@@ -215,6 +220,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
         copy_vertices!(factory,
                        encoder,
                        ambient,
+                       lightcolor,
                        lightpos,
                        out_color,
                        main_depth,
@@ -229,6 +235,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
                                        vertices: &[shader::Vertex],
                                        indices: &[u32],
                                        ambient: [f32; 4],
+                                       lightcolor: [f32; 4],
                                        lightpos: [f32; 3],
                                        model_m: Matrix4<f32>) {
         let factory = &mut self.factory;
@@ -239,6 +246,7 @@ impl<'z, R, F, C> Gpu<'z, R, F, C>
         copy_vertices!(factory,
                        encoder,
                        ambient,
+                       lightcolor,
                        lightpos,
                        out_color,
                        main_depth,

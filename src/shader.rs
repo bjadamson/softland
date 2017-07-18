@@ -19,6 +19,7 @@ gfx_defines!{
     constant Locals {
         model: [[f32; 4]; 4] = "u_model",
         ambient: [f32; 4] = "u_ambient",
+        lightcolor: [f32; 4] = "u_lightcolor",
         lightpos: [f32; 3] = "u_lightpos",
     }
 
@@ -28,6 +29,7 @@ gfx_defines!{
         model: gfx::Global<[[f32; 4]; 4]> = "u_model",
         ambient: gfx::Global<[f32; 4]> = "u_ambient",
         lightpos: gfx::Global<[f32; 3]> = "u_lightpos",
+        lightcolor: gfx::Global<[f32; 4]> = "u_lightcolor",
         out: gfx::RenderTarget<ColorFormat> = "target_0",
         depth: gfx::DepthTarget<DepthFormat> = gfx::state::Depth {
             fun: gfx::state::Comparison::Less,

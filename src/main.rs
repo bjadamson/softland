@@ -135,13 +135,16 @@ fn main() {
         let s = 0.22;
         let c = color::WHITE;
         let ambient_color = [c[0] * s, c[1] * s, c[2] * s, c[3]];
+
+        let diffuse_color = [1.0, 0.0, 0.0, 1.0];
         let diffuse_color_pos = [0.0, 0.0, 0.0];
+
         State {
             ui_buffers: ui_buffers,
             chat_history: ChatHistory::from_existing(&init_channels, chat_history_text, prune),
             chat_button_pressed: ChannelId::new(0),
             chat_window_state: chat_config,
-            editing_field: EditingFieldOption::NotEditing,
+            edit_chat_field: EditingFieldOption::NotEditing,
             framerate: 0.0,
             window_dimensions: (1024, 768),
             quit: false,
@@ -153,7 +156,9 @@ fn main() {
 
             // level data
             ambient_color: ambient_color,
-            diffuse_color_light_pos: diffuse_color_pos,
+
+            diffuse_color: diffuse_color,
+            diffuse_color_pos: diffuse_color_pos,
         }
     };
 

@@ -73,34 +73,34 @@ macro_rules! process_event {
                     Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
                     Some(VirtualKeyCode::Left) => {
                         $imgui.set_key(1, pressed);
-                        let x = $game_state.diffuse_color_light_pos[0];
-                        let y = $game_state.diffuse_color_light_pos[1];
-                        let z = $game_state.diffuse_color_light_pos[2];
-                        $game_state.diffuse_color_light_pos = [x + 1.0, y, z];
+                        let x = $game_state.diffuse_color_pos[0];
+                        let y = $game_state.diffuse_color_pos[1];
+                        let z = $game_state.diffuse_color_pos[2];
+                        $game_state.diffuse_color_pos = [x + 1.0, y, z];
 // camera.pan_x(-player.move_speed);
                     }
                     Some(VirtualKeyCode::Right) => {
                         $imgui.set_key(2, pressed);
-                        let x = $game_state.diffuse_color_light_pos[0];
-                        let y = $game_state.diffuse_color_light_pos[1];
-                        let z = $game_state.diffuse_color_light_pos[2];
-                        $game_state.diffuse_color_light_pos = [x - 1.0, y, z];
+                        let x = $game_state.diffuse_color_pos[0];
+                        let y = $game_state.diffuse_color_pos[1];
+                        let z = $game_state.diffuse_color_pos[2];
+                        $game_state.diffuse_color_pos = [x - 1.0, y, z];
 // camera.pan_x(player.move_speed);
                     }
                     Some(VirtualKeyCode::Up) => {
                         $imgui.set_key(3, pressed);
-                        let x = $game_state.diffuse_color_light_pos[0];
-                        let y = $game_state.diffuse_color_light_pos[1];
-                        let z = $game_state.diffuse_color_light_pos[2];
-                        $game_state.diffuse_color_light_pos = [x, y + 1.0, z];
+                        let x = $game_state.diffuse_color_pos[0];
+                        let y = $game_state.diffuse_color_pos[1];
+                        let z = $game_state.diffuse_color_pos[2];
+                        $game_state.diffuse_color_pos = [x, y + 1.0, z];
 // camera.pan_y(player.move_speed);
                     }
                     Some(VirtualKeyCode::Down) => {
                         $imgui.set_key(4, pressed);
-                        let x = $game_state.diffuse_color_light_pos[0];
-                        let y = $game_state.diffuse_color_light_pos[1];
-                        let z = $game_state.diffuse_color_light_pos[2];
-                        $game_state.diffuse_color_light_pos = [x, y - 1.0, z];
+                        let x = $game_state.diffuse_color_pos[0];
+                        let y = $game_state.diffuse_color_pos[1];
+                        let z = $game_state.diffuse_color_pos[2];
+                        $game_state.diffuse_color_pos = [x, y - 1.0, z];
 // camera.pan_y(-player.move_speed);
                     }
                     Some(VirtualKeyCode::PageUp) => $imgui.set_key(5, pressed),
@@ -375,7 +375,8 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                   &dimensions,
                                   &colors,
                                   state.ambient_color,
-                                  state.diffuse_color_light_pos.into(),
+                                  state.diffuse_color.into(),
+                                  state.diffuse_color_pos.into(),
                                   uv_matrix);
                     // println!("drawing triangle from file: {:?}", model);
                 }
@@ -386,7 +387,8 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                                 &plane_vertices,
                                                 &plane_indices,
                                                 state.ambient_color,
-                                                state.diffuse_color_light_pos.into(),
+                                                state.diffuse_color.into(),
+                                                state.diffuse_color_pos.into(),
                                                 uv_matrix);
             }
 
