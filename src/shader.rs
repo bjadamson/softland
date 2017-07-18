@@ -13,11 +13,13 @@ gfx_defines!{
     vertex Vertex {
         pos: [f32; 4] = "a_pos",
         color: [f32; 4] = "a_color",
+        normal: [f32; 3] = "a_normal",
     }
 
     constant Locals {
         model: [[f32; 4]; 4] = "u_model",
         ambient: [f32; 4] = "u_ambient",
+        lightpos: [f32; 3] = "u_lightpos",
     }
 
     pipeline pipe {
@@ -25,6 +27,7 @@ gfx_defines!{
         locals: gfx::ConstantBuffer<Locals> = "Locals",
         model: gfx::Global<[[f32; 4]; 4]> = "u_model",
         ambient: gfx::Global<[f32; 4]> = "u_ambient",
+        lightpos: gfx::Global<[f32; 3]> = "u_lightpos",
         out: gfx::RenderTarget<ColorFormat> = "target_0",
         depth: gfx::DepthTarget<DepthFormat> = gfx::state::Depth {
             fun: gfx::state::Comparison::Less,

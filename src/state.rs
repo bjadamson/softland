@@ -22,6 +22,7 @@ pub struct State {
 
     // level global data
     pub ambient_color: [f32; 4],
+    pub diffuse_color_light_pos: [f32; 3],
 }
 
 impl Component for State {
