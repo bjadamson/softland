@@ -1,4 +1,3 @@
-use cgmath;
 use cgmath::*;
 use imgui::*;
 
@@ -423,7 +422,7 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                 }
 
                 ui.new_line();
-                ui.child_frame(im_str!(""), ImVec2::new(-5.0, -20.0))
+                ui.child_frame(im_str!(""), ImVec2::new(-5.0, -60.0))
                     .always_resizable(false)
                     .input_allow(true) // interacting with internal scrollbar.
                     .scrollbar_horizontal(false)
@@ -436,6 +435,7 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                     let chat_entered_by_user = ui.input_text(im_str!(""), &mut state.ui_buffers.chat_input_buffer)
                         .auto_select_all(true)
                         .always_insert_mode(true)
+                        .allow_tab_input(false)
                         .chars_noblank(true)
                         .enter_returns_true(true)
                         .build();

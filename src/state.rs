@@ -79,7 +79,7 @@ pub struct ChatWindowState {
     pub user_editing: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct UiBuffers {
     pub chat_input_buffer: ImString,
     pub menu_input_buffer: ImString,
