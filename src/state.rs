@@ -15,6 +15,7 @@ pub struct State {
     pub chat_button_pressed: ChannelId,
     pub edit_chat_field: EditingFieldOption,
     pub framerate: f64,
+    pub fullscreen: bool,
     pub quit: bool,
     pub window_dimensions: (u32, u32),
 

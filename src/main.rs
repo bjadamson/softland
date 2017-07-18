@@ -134,7 +134,7 @@ fn main() {
         let c = color::WHITE;
         let ambient_color = [c[0] * s, c[1] * s, c[2] * s, c[3]];
 
-        let diffuse_color = [0.0, 0.0, 1.0, 0.9];
+        let diffuse_color = [1.0, 0.0, 1.0, 1.0];
         let diffuse_color_pos = [0.0, 0.0, 0.0];
 
         State {
@@ -145,6 +145,7 @@ fn main() {
             edit_chat_field: EditingFieldOption::NotEditing,
             framerate: 0.0,
             window_dimensions: (1024, 768),
+            fullscreen: true,
             quit: false,
 
             player: Player {

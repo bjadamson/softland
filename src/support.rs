@@ -163,6 +163,9 @@ macro_rules! process_event {
             }
             WindowEvent::MouseMoved(x, y) => {
 // Don't process mouse movements if the user is typing.
+                if $game_state.chat_window_state.user_editing {
+                    return;
+                }
 
                 let (x, y) = (x as f32, y as f32);
                 if $mouse.cursor_pos.is_none() {
@@ -197,12 +200,14 @@ macro_rules! process_event {
 
 fn calculate_color(height: f32) -> [f32; 4] {
     let c = {
-        if height > 8.0 {
+        if height > 0.6 {
             [0.9, 0.9, 0.9] // white
-        } else if height > 0.0 {
+        } else if height > 0.3 {
             [0.7, 0.7, 0.7] // greay
-        } else if height > -5.0 {
+        } else if height > -0.2 {
             [0.2, 0.7, 0.2] // green
+        } else if height > -0.5 {
+            [0.7, 0.4, 0.2] // brown
         } else {
             [0.2, 0.2, 0.7] // blue
         }
@@ -246,10 +251,13 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
     let (w, h) = state.window_dimensions;
     let events_loop = glutin::EventsLoop::new();
+
+    let monitor_id = glutin::get_available_monitors().nth(0).expect("Could not find a monitor.");
     let builder = glutin::WindowBuilder::new()
         .with_title(title)
         .with_dimensions(w, h)
-        .with_vsync();
+        .with_vsync()
+        .with_fullscreen(monitor_id);
     let (window, mut device, mut factory, mut main_color, mut main_depth) =
         gfx_window_glutin::init::<shader::ColorFormat, shader::DepthFormat>(builder, &events_loop);
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();

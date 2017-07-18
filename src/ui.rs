@@ -436,7 +436,6 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                         .auto_select_all(true)
                         .always_insert_mode(true)
                         .allow_tab_input(false)
-                        .chars_noblank(true)
                         .enter_returns_true(true)
                         .build();
                     if chat_entered_by_user {
