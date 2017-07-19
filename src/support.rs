@@ -3,6 +3,8 @@ use cgmath::*;
 
 use gfx;
 use gfx::Device;
+use gfx::traits::FactoryExt;
+
 use gfx_window_glutin;
 use glutin;
 use glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode, TouchPhase, WindowEvent};
@@ -25,6 +27,7 @@ use rand;
 use rand::*;
 use specs::*;
 
+use shape;
 use shader;
 use state;
 use state::*;
@@ -57,145 +60,157 @@ impl<'a> System<'a> for UpdateMouseStateSystem {
     }
 }
 
-macro_rules! process_event {
-    ($event:ident, $imgui:ident, $window:ident, $renderer:ident, $mouse:ident, $game_state:ident, $main_color:ident, $main_depth:ident) => (
-        match $event {
-            WindowEvent::Resized(_, _) => {
-                gfx_window_glutin::update_views(&$window, &mut $main_color, &mut $main_depth);
-                $renderer.update_render_target($main_color.clone());
-            }
-            WindowEvent::Closed => $game_state.quit = true,
-            WindowEvent::KeyboardInput(state, _, code, _) => {
-                let pressed = state == ElementState::Pressed;
-                let player = &mut $game_state.player;
-                let camera = &mut player.camera;
-
-                if code == Some(VirtualKeyCode::Return) {
-                    if !pressed {
-                        $game_state.chat_window_state.user_editing ^= true;
-                    }
-                    $imgui.set_key(11, pressed);
-                }
-                let editing = $game_state.chat_window_state.user_editing;
-                let editing = editing && (code != Some(VirtualKeyCode::Return));
-                let editing = editing && (code != Some(VirtualKeyCode::Escape));
-                if editing {
-                    return;
-                }
-                match code {
-                    Some(VirtualKeyCode::Tab) => $imgui.set_key(0, pressed),
-                    Some(VirtualKeyCode::Left) => {
-                        $imgui.set_key(1, pressed);
-                        let x = $game_state.diffuse_color_pos[0];
-                        let y = $game_state.diffuse_color_pos[1];
-                        let z = $game_state.diffuse_color_pos[2];
-                        $game_state.diffuse_color_pos = [x + 1.0, y, z];
-                    }
-                    Some(VirtualKeyCode::Right) => {
-                        $imgui.set_key(2, pressed);
-                        let x = $game_state.diffuse_color_pos[0];
-                        let y = $game_state.diffuse_color_pos[1];
-                        let z = $game_state.diffuse_color_pos[2];
-                        $game_state.diffuse_color_pos = [x - 1.0, y, z];
-                    }
-                    Some(VirtualKeyCode::Up) => {
-                        $imgui.set_key(3, pressed);
-                        let x = $game_state.diffuse_color_pos[0];
-                        let y = $game_state.diffuse_color_pos[1];
-                        let z = $game_state.diffuse_color_pos[2];
-                        $game_state.diffuse_color_pos = [x, y + 1.0, z];
-                    }
-                    Some(VirtualKeyCode::Down) => {
-                        $imgui.set_key(4, pressed);
-                        let x = $game_state.diffuse_color_pos[0];
-                        let y = $game_state.diffuse_color_pos[1];
-                        let z = $game_state.diffuse_color_pos[2];
-                        $game_state.diffuse_color_pos = [x, y - 1.0, z];
-                    }
-                    Some(VirtualKeyCode::PageUp) => $imgui.set_key(5, pressed),
-                    Some(VirtualKeyCode::PageDown) => $imgui.set_key(6, pressed),
-                    Some(VirtualKeyCode::Home) => $imgui.set_key(7, pressed),
-                    Some(VirtualKeyCode::End) => $imgui.set_key(8, pressed),
-                    Some(VirtualKeyCode::Delete) => $imgui.set_key(9, pressed),
-                    Some(VirtualKeyCode::Back) => $imgui.set_key(10, pressed),
-
-                    Some(VirtualKeyCode::Escape) => {
-// If the user is currently editing text, then close the editing field
-// without submission.
-//
-// Otherwise if the user is pushing down escape, we quit.
-                        if $game_state.chat_window_state.user_editing {
-                            $game_state.chat_window_state.user_editing ^= true;
-                        } else if pressed {
-                            $game_state.quit = true;
-                        }
-                        $imgui.set_key(12, pressed);
-                    }
-                    Some(VirtualKeyCode::A) => {
-                        $imgui.set_key(13, pressed);
-
-                        camera.move_left(player.move_speed);
-                    }
-                    Some(VirtualKeyCode::C) => $imgui.set_key(14, pressed),
-                    Some(VirtualKeyCode::D) => {
-                        camera.move_right(player.move_speed);
-                    }
-                    Some(VirtualKeyCode::S) => {
-                        camera.move_backward(player.move_speed);
-                    }
-                    Some(VirtualKeyCode::V) => $imgui.set_key(15, pressed),
-                    Some(VirtualKeyCode::W) => {
-                        camera.move_forward(player.move_speed);
-                    }
-                    Some(VirtualKeyCode::X) => $imgui.set_key(16, pressed),
-                    Some(VirtualKeyCode::Y) => $imgui.set_key(17, pressed),
-                    Some(VirtualKeyCode::Z) => $imgui.set_key(18, pressed),
-                    Some(VirtualKeyCode::LControl) |
-                    Some(VirtualKeyCode::RControl) => $imgui.set_key_ctrl(pressed),
-                    Some(VirtualKeyCode::LShift) |
-                    Some(VirtualKeyCode::RShift) => $imgui.set_key_shift(pressed),
-                    Some(VirtualKeyCode::LAlt) |
-                    Some(VirtualKeyCode::RAlt) => $imgui.set_key_alt(pressed),
-                    Some(VirtualKeyCode::LWin) |
-                    Some(VirtualKeyCode::RWin) => $imgui.set_key_super(pressed),
-                    _ => {}
-                }
-            }
-            WindowEvent::MouseMoved(x, y) => {
-// Don't process mouse movements if the user is typing.
-                if $game_state.chat_window_state.user_editing {
-                    return;
-                }
-
-                let (x, y) = (x as f32, y as f32);
-                if $mouse.cursor_pos.is_none() {
-                    let pos = (x, y);
-                    $mouse.cursor_pos = Some(pos);
-                } else {
-                    let pos = $mouse.cursor_pos.unwrap();
-                    $game_state.player.camera.rotate_to((x, y), pos, $mouse.sensitivity);
-                }
-                $mouse.cursor_pos = Some((x, y));
-            }
-            WindowEvent::MouseInput(state, MouseButton::Left) => {
-                $mouse.pressed.0 = state == ElementState::Pressed
-            }
-            WindowEvent::MouseInput(state, MouseButton::Right) => {
-                $mouse.pressed.1 = state == ElementState::Pressed
-            }
-            WindowEvent::MouseInput(state, MouseButton::Middle) => {
-                $mouse.pressed.2 = state == ElementState::Pressed
-            }
-            WindowEvent::MouseWheel(MouseScrollDelta::LineDelta(_, y), TouchPhase::Moved) => {
-                $mouse.wheel = y
-            }
-            WindowEvent::MouseWheel(MouseScrollDelta::PixelDelta(_, y), TouchPhase::Moved) => {
-                $mouse.wheel = y
-            }
-            WindowEvent::ReceivedCharacter(c) => $imgui.add_input_character(c),
-            _ => ()
+fn process_event<'a, R>(event: &glutin::WindowEvent,
+                        imgui: &mut ImGui,
+                        window: &glutin::Window,
+                        renderer: &mut Renderer<R>,
+                        mouse: &mut state::MouseState,
+                        game_state: &mut state::State,
+                        main_color: &'a mut shader::OutColor<R>,
+                        main_depth: &'a mut shader::OutDepth<R>)
+    where R: gfx::Resources + 'a
+{
+    match event {
+        &WindowEvent::Resized(_, _) => {
+            dispatcher.dispatch(&mut world.res);
+            // TODO: This used to work, when process_event() was a macro, before I turned it into
+            // this fn. Should figure out we can't call update_views anymore. But for now I prefer
+            // this as a function over the functionality being fixed. (not even sure what it did,
+            // didn't look into it after gfx example code showed how it is to be used).
+            // gfx_window_glutin::update_views(window, main_color, main_depth);
+            renderer.update_render_target(main_color.clone());
         }
-    )
+        &WindowEvent::Closed => game_state.quit = true,
+        &WindowEvent::KeyboardInput(state, _, code, _) => {
+            let pressed = state == ElementState::Pressed;
+            let player = &mut game_state.player;
+            let camera = &mut player.camera;
+
+            if code == Some(VirtualKeyCode::Return) {
+                if !pressed {
+                    game_state.chat_window_state.user_editing ^= true;
+                }
+                imgui.set_key(11, pressed);
+            }
+            let editing = game_state.chat_window_state.user_editing;
+            let editing = editing && (code != Some(VirtualKeyCode::Return));
+            let editing = editing && (code != Some(VirtualKeyCode::Escape));
+            if editing {
+                return;
+            }
+            match code {
+                Some(VirtualKeyCode::Tab) => imgui.set_key(0, pressed),
+                Some(VirtualKeyCode::Left) => {
+                    imgui.set_key(1, pressed);
+                    let x = game_state.diffuse_color_pos[0];
+                    let y = game_state.diffuse_color_pos[1];
+                    let z = game_state.diffuse_color_pos[2];
+                    game_state.diffuse_color_pos = [x + 1.0, y, z];
+                }
+                Some(VirtualKeyCode::Right) => {
+                    imgui.set_key(2, pressed);
+                    let x = game_state.diffuse_color_pos[0];
+                    let y = game_state.diffuse_color_pos[1];
+                    let z = game_state.diffuse_color_pos[2];
+                    game_state.diffuse_color_pos = [x - 1.0, y, z];
+                }
+                Some(VirtualKeyCode::Up) => {
+                    imgui.set_key(3, pressed);
+                    let x = game_state.diffuse_color_pos[0];
+                    let y = game_state.diffuse_color_pos[1];
+                    let z = game_state.diffuse_color_pos[2];
+                    game_state.diffuse_color_pos = [x, y + 1.0, z];
+                }
+                Some(VirtualKeyCode::Down) => {
+                    imgui.set_key(4, pressed);
+                    let x = game_state.diffuse_color_pos[0];
+                    let y = game_state.diffuse_color_pos[1];
+                    let z = game_state.diffuse_color_pos[2];
+                    game_state.diffuse_color_pos = [x, y - 1.0, z];
+                }
+                Some(VirtualKeyCode::PageUp) => imgui.set_key(5, pressed),
+                Some(VirtualKeyCode::PageDown) => imgui.set_key(6, pressed),
+                Some(VirtualKeyCode::Home) => imgui.set_key(7, pressed),
+                Some(VirtualKeyCode::End) => imgui.set_key(8, pressed),
+                Some(VirtualKeyCode::Delete) => imgui.set_key(9, pressed),
+                Some(VirtualKeyCode::Back) => imgui.set_key(10, pressed),
+
+                Some(VirtualKeyCode::Escape) => {
+                    // If the user is currently editing text, then close the editing field
+                    // without submission.
+                    //
+                    // Otherwise if the user is pushing down escape, we quit.
+                    if game_state.chat_window_state.user_editing {
+                        game_state.chat_window_state.user_editing ^= true;
+                    } else if pressed {
+                        game_state.quit = true;
+                    }
+                    imgui.set_key(12, pressed);
+                }
+                Some(VirtualKeyCode::A) => {
+                    imgui.set_key(13, pressed);
+
+                    camera.move_left(player.move_speed);
+                }
+                Some(VirtualKeyCode::C) => imgui.set_key(14, pressed),
+                Some(VirtualKeyCode::D) => {
+                    camera.move_right(player.move_speed);
+                }
+                Some(VirtualKeyCode::S) => {
+                    camera.move_backward(player.move_speed);
+                }
+                Some(VirtualKeyCode::V) => imgui.set_key(15, pressed),
+                Some(VirtualKeyCode::W) => {
+                    camera.move_forward(player.move_speed);
+                }
+                Some(VirtualKeyCode::X) => imgui.set_key(16, pressed),
+                Some(VirtualKeyCode::Y) => imgui.set_key(17, pressed),
+                Some(VirtualKeyCode::Z) => imgui.set_key(18, pressed),
+                Some(VirtualKeyCode::LControl) |
+                Some(VirtualKeyCode::RControl) => imgui.set_key_ctrl(pressed),
+                Some(VirtualKeyCode::LShift) |
+                Some(VirtualKeyCode::RShift) => imgui.set_key_shift(pressed),
+                Some(VirtualKeyCode::LAlt) |
+                Some(VirtualKeyCode::RAlt) => imgui.set_key_alt(pressed),
+                Some(VirtualKeyCode::LWin) |
+                Some(VirtualKeyCode::RWin) => imgui.set_key_super(pressed),
+                _ => {}
+            }
+        }
+        &WindowEvent::MouseMoved(x, y) => {
+            // Don't process mouse movements if the user is typing.
+            if game_state.chat_window_state.user_editing {
+                return;
+            }
+
+            let (x, y) = (x as f32, y as f32);
+            if mouse.cursor_pos.is_none() {
+                let pos = (x, y);
+                mouse.cursor_pos = Some(pos);
+            } else {
+                let pos = mouse.cursor_pos.unwrap();
+                game_state.player.camera.rotate_to((x, y), pos, mouse.sensitivity);
+            }
+            mouse.cursor_pos = Some((x, y));
+        }
+        &WindowEvent::MouseInput(state, MouseButton::Left) => {
+            mouse.pressed.0 = state == ElementState::Pressed
+        }
+        &WindowEvent::MouseInput(state, MouseButton::Right) => {
+            mouse.pressed.1 = state == ElementState::Pressed
+        }
+        &WindowEvent::MouseInput(state, MouseButton::Middle) => {
+            mouse.pressed.2 = state == ElementState::Pressed
+        }
+        &WindowEvent::MouseWheel(MouseScrollDelta::LineDelta(_, y), TouchPhase::Moved) => {
+            mouse.wheel = y
+        }
+        &WindowEvent::MouseWheel(MouseScrollDelta::PixelDelta(_, y), TouchPhase::Moved) => {
+            mouse.wheel = y
+        }
+        &WindowEvent::ReceivedCharacter(c) => imgui.add_input_character(c),
+        _ => (),
+    }
 }
 
 fn calculate_color(height: f32) -> [f32; 4] {
@@ -215,7 +230,7 @@ fn calculate_color(height: f32) -> [f32; 4] {
     [c[0], c[1], c[2], 1.0]
 }
 
-fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
+fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u16>) {
     let seed = rand::thread_rng().gen();
     let plane = Plane::subdivide(256, 256);
     let perlin = Perlin::new().set_seed(seed);
@@ -233,18 +248,59 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
         })
         .collect();
 
-    let indices: Vec<u32> = plane.indexed_polygon_iter()
+    let indices: Vec<u16> = plane.indexed_polygon_iter()
         .take(n)
         .triangulate()
         .vertices()
-        .map(|i| i as u32)
+        .map(|i| i as u16)
         .collect();
     (vertexes, indices)
 }
 
+#[inline(always)]
+fn copy_vertices<'a, R, F, C, B>(factory: &mut F,
+                                 encoder: &mut gfx::Encoder<R, C>,
+                                 ambient: [f32; 4],
+                                 light_color: [f32; 4],
+                                 light_pos: [f32; 3],
+                                 out_color: &'a shader::OutColor<R>,
+                                 depth: &shader::OutDepth<R>,
+                                 pso: &gfx::PipelineState<R, shader::pipe::Meta>,
+                                 model_m: Matrix4<f32>,
+                                 viewpos: [f32; 3],
+                                 vertices: &[shader::Vertex],
+                                 indices: B)
+    where R: gfx::Resources,
+          F: gfx::Factory<R> + 'a,
+          C: gfx::CommandBuffer<R> + 'a,
+          B: gfx::IntoIndexBuffer<R> + 'a
+{
+    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&vertices, indices);
+    let data = shader::pipe::Data {
+        vbuf: vertex_buffer,
+        locals: factory.create_constant_buffer(1),
+        model: model_m.into(),
+        viewpos: viewpos.into(),
+        ambient: ambient,
+        lightcolor: light_color,
+        lightpos: light_pos,
+        out: out_color.clone(),
+        depth: depth.clone(),
+    };
+    let locals = shader::Locals {
+        model: data.model,
+        viewpos: data.viewpos,
+        ambient: data.ambient,
+        lightcolor: data.lightcolor,
+        lightpos: data.lightpos,
+    };
+    encoder.update_buffer(&data.locals, &[locals], 0).unwrap();
+    encoder.draw(&slice, &pso, &data);
+}
+
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
-                                           mut state: State,
+                                           state: State,
                                            file_contents: &str,
                                            mut build_ui: F) {
     let mut imgui = ImGui::init();
@@ -317,130 +373,129 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
 
-    // {
-    // let (x, y) = (w / 2, h / 2);
-    // state.mouse.pos = (x as f32, y as f32);
-    // window.set_cursor_position(x as i32, y as i32).unwrap();
-    // }
-
     loop {
+        dispatcher.dispatch(&mut world.res);
+        let mut state = &mut *world.write_resource::<State>();
         {
-            let mut state = &mut *world.write_resource::<State>();
             sim_time = clock.tick(&step::FixedStep::new(&counter));
             counter.tick(&sim_time);
             state.framerate = sim_time.instantaneous_frame_rate();
 
             events_loop.poll_events(|glutin::Event::WindowEvent { event, .. }| {
-                process_event!(event,
-                               imgui,
-                               window,
-                               renderer,
-                               mouse,
-                               state,
-                               main_color,
-                               main_depth);
+                process_event(&event,
+                              &mut imgui,
+                              &window,
+                              &mut renderer,
+                              &mut mouse,
+                              &mut state,
+                              &mut main_color,
+                              &mut main_depth);
             });
-
-            let now = Instant::now();
-            let delta = now - last_frame;
-            let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
-            last_frame = now;
-
-            update_mouse(&mut imgui, &mut mouse);
-
-            // Draw our scene
-            //
-            // 1. Clear the background.
-            encoder.clear(&mut main_color, clear_color);
-            encoder.clear_depth(&mut main_depth, 1.0);
-
-            // 2. Submit geometry to GPU.
-            {
-                let mut gpu =
-                    gpu::Gpu::new(&mut factory, &mut encoder, &mut main_color, &mut main_depth);
-
-                let dimensions = (0.25, 0.25, 0.25);
-                let rect_colors: [[f32; 4]; 8] = [color::RED,
-                                                  color::YELLOW,
-                                                  color::RED,
-                                                  color::YELLOW,
-                                                  color::RED,
-                                                  color::YELLOW,
-                                                  color::RED,
-                                                  color::YELLOW];
-
-                let view = state.player.camera.compute_view();
-                // let angle = cgmath::Deg(sim_time.frame_number() as f32);
-
-                // non-ui 2d stuffz
-                let projection = {
-                    let (width, height) = state.window_dimensions;
-                    let aspect_ratio = width / height;
-                    let (near, far) = (0.1, 200.0);
-                    let fovy = cgmath::Deg(60.0);
-                    cgmath::perspective(fovy, aspect_ratio as f32, near, far)
-                };
-
-                // draw based on data from foo.txt
-                for model in world.read::<state::Model>().join() {
-                    let tmatrix = Matrix4::from_translation(model.translation);
-                    let rmatrix: Matrix4<f32> = model.rotation.into();
-                    let smatrix =
-                        Matrix4::from_nonuniform_scale(model.scale.x, model.scale.y, model.scale.z);
-
-                    let mmatrix = tmatrix * rmatrix * smatrix;
-                    let uv_matrix = projection * view * mmatrix;
-
-                    let colors = [color::WHITE,
-                                  color::PINK,
-                                  color::WHITE,
-                                  color::PINK,
-                                  color::WHITE,
-                                  color::PINK];
-                    let view = model.translation;
-                    gpu.draw_cube(&cube_pso,
-                                  &dimensions,
-                                  &colors,
-                                  state.ambient_color,
-                                  state.diffuse_color.into(),
-                                  state.diffuse_color_pos.into(),
-                                  uv_matrix,
-                                  view);
-                    // println!("drawing triangle from file: {:?}", model);
-                }
-
-                let mmatrix = Matrix4::identity();
-                let uv_matrix = projection * view * mmatrix;
-                let viewpos = Vector3::new(0.0, 0.0, 0.0);
-                gpu.draw_triangle_from_vertices(&generated_pso,
-                                                &plane_vertices,
-                                                &plane_indices,
-                                                state.ambient_color,
-                                                state.diffuse_color.into(),
-                                                state.diffuse_color_pos.into(),
-                                                uv_matrix,
-                                                viewpos);
-            }
-
-            // 3. Construct our UI.
-            let size_points = window.get_inner_size_points().unwrap();
-            let size_pixels = window.get_inner_size_pixels().unwrap();
-            let ui = imgui.frame(size_points, size_pixels, delta_s);
-            build_ui(&ui, &mut state);
-
-            // 4. Draw our scene (both UI and geometry submitted via encoder).
-            renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
-
-            // 3) Flush our device and swap the buffers.
-            encoder.flush(&mut device);
-            window.swap_buffers().unwrap();
-            device.cleanup();
-
-            if state.quit {
-                break;
-            }
         }
-        dispatcher.dispatch(&mut world.res);
+
+        let now = Instant::now();
+        let delta = now - last_frame;
+        let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
+        last_frame = now;
+
+        update_mouse(&mut imgui, &mut mouse);
+
+        // Draw our scene
+        //
+        // 1. Clear the background.
+        encoder.clear(&mut main_color, clear_color);
+        encoder.clear_depth(&mut main_depth, 1.0);
+
+        // 2. Submit geometry to GPU.
+        {
+            let dimensions = (0.25, 0.25, 0.25);
+            let rect_colors: [[f32; 4]; 8] = [color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW,
+                                              color::RED,
+                                              color::YELLOW];
+
+            let view = state.player.camera.compute_view();
+            // let angle = cgmath::Deg(sim_time.frame_number() as f32);
+
+            // non-ui 2d stuffz
+            let projection = {
+                let (width, height) = state.window_dimensions;
+                let aspect_ratio = width / height;
+                let (near, far) = (0.1, 200.0);
+                let fovy = cgmath::Deg(60.0);
+                cgmath::perspective(fovy, aspect_ratio as f32, near, far)
+            };
+
+            // draw based on data from foo.txt
+            for model in world.read::<state::Model>().join() {
+                let tmatrix = Matrix4::from_translation(model.translation);
+                let rmatrix: Matrix4<f32> = model.rotation.into();
+                let smatrix =
+                    Matrix4::from_nonuniform_scale(model.scale.x, model.scale.y, model.scale.z);
+
+                let mmatrix = tmatrix * rmatrix * smatrix;
+                let uv_matrix = projection * view * mmatrix;
+
+                let colors = [color::WHITE,
+                              color::PINK,
+                              color::WHITE,
+                              color::PINK,
+                              color::WHITE,
+                              color::PINK];
+                let viewpos = model.translation;
+                let (vertices, indices) = shape::construct_cube(&dimensions, &colors);
+                copy_vertices(&mut factory,
+                              &mut encoder,
+                              state.ambient_color,
+                              state.diffuse_color,
+                              state.diffuse_color_pos,
+                              &main_color,
+                              &main_depth,
+                              &cube_pso,
+                              uv_matrix,
+                              viewpos.into(),
+                              &vertices,
+                              indices);
+            }
+
+            let mmatrix = Matrix4::identity();
+            let uv_matrix = projection * view * mmatrix;
+            let viewpos = Vector3::new(0.0, 0.0, 0.0);
+            copy_vertices(&mut factory,
+                          &mut encoder,
+                          state.ambient_color,
+                          state.diffuse_color,
+                          state.diffuse_color_pos,
+                          &main_color,
+                          &main_depth,
+                          &generated_pso,
+                          uv_matrix,
+                          viewpos.into(),
+                          &plane_vertices,
+                          plane_indices.as_slice());
+        }
+
+        // 3. Construct our UI.
+        let size_points = window.get_inner_size_points().unwrap();
+        let size_pixels = window.get_inner_size_pixels().unwrap();
+        let ui = imgui.frame(size_points, size_pixels, delta_s);
+        build_ui(&ui, &mut state);
+
+        // 4. Draw our scene (both UI and geometry submitted via encoder).
+        renderer.render(ui, &mut factory, &mut encoder).expect("Rendering failed");
+
+        // 3) Flush our device and swap the buffers.
+        encoder.flush(&mut device);
+        window.swap_buffers().unwrap();
+        device.cleanup();
+
+        if state.quit {
+            break;
+        }
     }
 }
 

@@ -144,7 +144,7 @@ fn main() {
             chat_window_state: chat_config,
             edit_chat_field: EditingFieldOption::NotEditing,
             framerate: 0.0,
-            window_dimensions: (1024, 768),
+            window_dimensions: (1920, 1080),
             fullscreen: true,
             quit: false,
 
