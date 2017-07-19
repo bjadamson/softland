@@ -31,6 +31,18 @@ impl Camera {
         }
     }
 
+    pub fn from_rot<A: Into<[f32; 3]>>(rot: A) -> Camera {
+        let rot: [f32; 3] = rot.into();
+        let mut camera = Camera::new();
+        let euler = Euler {
+            x: Deg(rot[0]),
+            y: Deg(rot[1]),
+            z: Deg(rot[2]),
+        };
+        camera.orientation = Quaternion::from(euler);
+        camera
+    }
+
     pub fn compute_view(&self) -> Mat4 {
         let rotation: Mat4 = Mat4::from(self.orientation);
 

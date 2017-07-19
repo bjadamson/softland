@@ -270,6 +270,7 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
 }
 
 fn calculate_color(height: f32) -> [f32; 4] {
+    println!("height {}", height);
     let c = {
         if height > 0.6 {
             [0.9, 0.9, 0.9] // white
@@ -283,19 +284,22 @@ fn calculate_color(height: f32) -> [f32; 4] {
             [0.2, 0.2, 0.7] // blue
         }
     };
-    [c[0], c[1], c[2], 1.0]
+    let m = 1.0;//height.abs();
+    [c[0] * m, c[1] * m, c[2] * m, 1.0]
 }
 
-fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u16>) {
+fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
     let seed = rand::thread_rng().gen();
-    let plane = Plane::subdivide(256, 256);
+    let plane = Plane::subdivide(16, 16);
     let perlin = Perlin::new().set_seed(seed);
     let vertexes: Vec<shader::Vertex> = plane.shared_vertex_iter()
         .take(n)
         .map(|v| {
             let pos = v.pos;
             let value = perlin.get(pos);
-            let pos = [pos[0], pos[1], value, 1.0];
+
+            let (m, n) = (130.0, 80.0);
+            let pos = [pos[0] * m, pos[1] * m, value * n, 1.0];
             shader::Vertex {
                 pos: pos,
                 color: calculate_color(value),
@@ -304,11 +308,11 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u16>) {
         })
         .collect();
 
-    let indices: Vec<u16> = plane.indexed_polygon_iter()
+    let indices = plane.indexed_polygon_iter()
         .take(n)
         .triangulate()
         .vertices()
-        .map(|i| i as u16)
+        .map(|i| i as u32)
         .collect();
     (vertexes, indices)
 }
@@ -428,6 +432,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut clock = GameClock::new();
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
+    let mut terrain_rot = 0.0;
 
     loop {
         dispatcher.dispatch(&mut world.res);
@@ -481,8 +486,8 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             let projection = {
                 let (width, height) = state.window_dimensions;
                 let aspect_ratio = width / height;
-                let (near, far) = (0.1, 200.0);
-                let fovy = cgmath::Deg(60.0);
+                let (near, far) = (0.1, 2000.0);
+                let fovy = cgmath::Deg(75.0);
                 cgmath::perspective(fovy, aspect_ratio as f32, near, far)
             };
 
@@ -518,7 +523,13 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                               indices);
             }
 
-            let mmatrix = Matrix4::identity();
+            let tmatrix = Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.0));
+
+            let rmatrix: Matrix4<f32> = Quaternion::from_angle_x(cgmath::Deg(0.0)).into();
+
+            let smatrix = Matrix4::from_translation(Vector3::new(10.0, 10.0, 10.0));
+            let mmatrix = tmatrix * rmatrix * smatrix;
+
             let uv_matrix = projection * view * mmatrix;
             let viewpos = Vector3::new(0.0, 0.0, 0.0);
             copy_vertices(&mut factory,

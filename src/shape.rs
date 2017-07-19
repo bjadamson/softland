@@ -165,6 +165,6 @@ fn make_cube_normals() -> [[f32; 3]; 36] {
      [0.0, 0.0, 1.0]]
 }
 
-pub fn make_triangle_vertices(radius: f32) -> [[f32; 4]; 3] {
+fn make_triangle_vertices(radius: f32) -> [[f32; 4]; 3] {
     [[-radius, -radius, 0.0, 1.0], [radius, -radius, 0.0, 1.0], [0.0, radius, 0.0, 1.0]]
 }

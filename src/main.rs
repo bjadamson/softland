@@ -149,7 +149,7 @@ fn main() {
             quit: false,
 
             player: Player {
-                camera: Camera::new(),
+                camera: Camera::from_rot([-90.0, 0.0, 60.0]),
                 move_speed: 0.2,
             },
 
@@ -161,7 +161,7 @@ fn main() {
         }
     };
 
-    state.player.camera.move_backward(5.0);
+    state.player.camera.move_backward(65.0);
     let contents = {
         let mut file = File::open("data/foo.txt").unwrap();
         let mut contents = String::new();
