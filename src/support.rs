@@ -72,7 +72,6 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
 {
     match event {
         &WindowEvent::Resized(_, _) => {
-            dispatcher.dispatch(&mut world.res);
             // TODO: This used to work, when process_event() was a macro, before I turned it into
             // this fn. Should figure out we can't call update_views anymore. But for now I prefer
             // this as a function over the functionality being fixed. (not even sure what it did,
@@ -95,13 +94,22 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
             let editing = game_state.chat_window_state.user_editing;
             let editing = editing && (code != Some(VirtualKeyCode::Return));
             let editing = editing && (code != Some(VirtualKeyCode::Escape));
-            if editing {
-                return;
+
+            macro_rules! guard {
+                () => {
+                    if editing {
+                        return;
+                    }
+                }
             }
             match code {
-                Some(VirtualKeyCode::Tab) => imgui.set_key(0, pressed),
+                Some(VirtualKeyCode::Tab) => {
+                    imgui.set_key(0, pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::Left) => {
                     imgui.set_key(1, pressed);
+                    
                     let x = game_state.diffuse_color_pos[0];
                     let y = game_state.diffuse_color_pos[1];
                     let z = game_state.diffuse_color_pos[2];
@@ -109,6 +117,7 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                 }
                 Some(VirtualKeyCode::Right) => {
                     imgui.set_key(2, pressed);
+                    guard!();
                     let x = game_state.diffuse_color_pos[0];
                     let y = game_state.diffuse_color_pos[1];
                     let z = game_state.diffuse_color_pos[2];
@@ -116,6 +125,7 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                 }
                 Some(VirtualKeyCode::Up) => {
                     imgui.set_key(3, pressed);
+                    guard!();
                     let x = game_state.diffuse_color_pos[0];
                     let y = game_state.diffuse_color_pos[1];
                     let z = game_state.diffuse_color_pos[2];
@@ -123,19 +133,38 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                 }
                 Some(VirtualKeyCode::Down) => {
                     imgui.set_key(4, pressed);
+                    guard!();
                     let x = game_state.diffuse_color_pos[0];
                     let y = game_state.diffuse_color_pos[1];
                     let z = game_state.diffuse_color_pos[2];
                     game_state.diffuse_color_pos = [x, y - 1.0, z];
                 }
-                Some(VirtualKeyCode::PageUp) => imgui.set_key(5, pressed),
-                Some(VirtualKeyCode::PageDown) => imgui.set_key(6, pressed),
-                Some(VirtualKeyCode::Home) => imgui.set_key(7, pressed),
-                Some(VirtualKeyCode::End) => imgui.set_key(8, pressed),
-                Some(VirtualKeyCode::Delete) => imgui.set_key(9, pressed),
-                Some(VirtualKeyCode::Back) => imgui.set_key(10, pressed),
-
+                Some(VirtualKeyCode::PageUp) => {
+                    imgui.set_key(5, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::PageDown) => {
+                    imgui.set_key(6, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::Home) => {
+                    imgui.set_key(7, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::End) => {
+                    imgui.set_key(8, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::Delete) => {
+                    imgui.set_key(9, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::Back) => {
+                    imgui.set_key(10, pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::Escape) => {
+                    imgui.set_key(12, pressed);
                     // If the user is currently editing text, then close the editing field
                     // without submission.
                     //
@@ -145,35 +174,62 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                     } else if pressed {
                         game_state.quit = true;
                     }
-                    imgui.set_key(12, pressed);
                 }
                 Some(VirtualKeyCode::A) => {
                     imgui.set_key(13, pressed);
-
+                    guard!();
                     camera.move_left(player.move_speed);
                 }
-                Some(VirtualKeyCode::C) => imgui.set_key(14, pressed),
+                Some(VirtualKeyCode::C) => {
+                    imgui.set_key(14, pressed);
+                }
                 Some(VirtualKeyCode::D) => {
+                    guard!();
                     camera.move_right(player.move_speed);
                 }
                 Some(VirtualKeyCode::S) => {
+                    guard!();
                     camera.move_backward(player.move_speed);
                 }
-                Some(VirtualKeyCode::V) => imgui.set_key(15, pressed),
+                Some(VirtualKeyCode::V) => {
+                    guard!();
+                    imgui.set_key(15, pressed);
+                }
                 Some(VirtualKeyCode::W) => {
+                    guard!();
                     camera.move_forward(player.move_speed);
                 }
-                Some(VirtualKeyCode::X) => imgui.set_key(16, pressed),
-                Some(VirtualKeyCode::Y) => imgui.set_key(17, pressed),
-                Some(VirtualKeyCode::Z) => imgui.set_key(18, pressed),
+                Some(VirtualKeyCode::X) => {
+                    imgui.set_key(16, pressed);
+                }
+                Some(VirtualKeyCode::Y) => {
+                    imgui.set_key(17, pressed);
+                    guard!();
+                }
+                Some(VirtualKeyCode::Z) => {
+                    imgui.set_key(18, pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::LControl) |
-                Some(VirtualKeyCode::RControl) => imgui.set_key_ctrl(pressed),
+                Some(VirtualKeyCode::RControl) => {
+                    imgui.set_key_ctrl(pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::LShift) |
-                Some(VirtualKeyCode::RShift) => imgui.set_key_shift(pressed),
+                Some(VirtualKeyCode::RShift) => {
+                    imgui.set_key_shift(pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::LAlt) |
-                Some(VirtualKeyCode::RAlt) => imgui.set_key_alt(pressed),
+                Some(VirtualKeyCode::RAlt) => {
+                    imgui.set_key_alt(pressed);
+                    guard!();
+                }
                 Some(VirtualKeyCode::LWin) |
-                Some(VirtualKeyCode::RWin) => imgui.set_key_super(pressed),
+                Some(VirtualKeyCode::RWin) => {
+                    imgui.set_key_super(pressed);
+                    guard!();
+                }
                 _ => {}
             }
         }

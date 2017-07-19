@@ -389,7 +389,6 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
     let (chat_w, chat_h) = state.chat_window_state.dimensions;
     let (chat_w, chat_h) = (chat_w as f32, chat_h as f32);
     let window_pos = state.chat_window_state.pos;
-    // let button_height = state.button_padding;
 
     ui.with_style_vars(styles, || {
         ui.window(im_str!("ChatWindow"))
@@ -422,7 +421,7 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                 }
 
                 ui.new_line();
-                ui.child_frame(im_str!(""), ImVec2::new(-5.0, -60.0))
+                ui.child_frame(im_str!(""), ImVec2::new(-5.0, -20.0))
                     .always_resizable(false)
                     .input_allow(true) // interacting with internal scrollbar.
                     .scrollbar_horizontal(false)
