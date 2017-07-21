@@ -1,5 +1,6 @@
 use cgmath::*;
 use imgui::*;
+use imgui_sys;
 
 use color;
 use chat_history::{ChannelId, ChatHistory};
@@ -437,6 +438,10 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                         .allow_tab_input(false)
                         .enter_returns_true(true)
                         .build();
+                    // This next function call makes the input widget within the chat bar have keyboard focus.
+                    // Without this call, the user has to click on the input widget.
+                    unsafe { imgui_sys::igSetKeyboardFocusHere(-1); }
+
                     if chat_entered_by_user {
                         let prefix = b"You: ";
                         let mut msg = state.ui_buffers.chat_input_buffer.as_bytes().to_owned();

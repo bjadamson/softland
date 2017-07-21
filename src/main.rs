@@ -11,6 +11,7 @@ extern crate game_time;
 extern crate gfx;
 extern crate gfx_window_glutin;
 extern crate glutin;
+extern crate imgui_sys;
 extern crate imgui_gfx_renderer;
 
 #[macro_use]
