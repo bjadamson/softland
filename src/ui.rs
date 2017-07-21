@@ -422,7 +422,12 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                 }
 
                 ui.new_line();
-                ui.child_frame(im_str!(""), ImVec2::new(-5.0, -20.0))
+                let child_height = if state.chat_window_state.user_editing {
+                    -30.0
+                } else {
+                    -5.0
+                };
+                ui.child_frame(im_str!(""), ImVec2::new(-5.0, child_height))
                     .always_resizable(false)
                     .input_allow(true) // interacting with internal scrollbar.
                     .scrollbar_horizontal(false)
@@ -433,9 +438,6 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                     });
                 if state.chat_window_state.user_editing {
                     let chat_entered_by_user = ui.input_text(im_str!(""), &mut state.ui_buffers.chat_input_buffer)
-                        .auto_select_all(true)
-                        .always_insert_mode(true)
-                        .allow_tab_input(false)
                         .enter_returns_true(true)
                         .build();
                     // This next function call makes the input widget within the chat bar have keyboard focus.
@@ -443,13 +445,15 @@ fn show_chat_window<'a>(ui: &Ui<'a>, state: &mut State) {
                     unsafe { imgui_sys::igSetKeyboardFocusHere(-1); }
 
                     if chat_entered_by_user {
-                        let prefix = b"You: ";
-                        let mut msg = state.ui_buffers.chat_input_buffer.as_bytes().to_owned();
-                        for (pos, byte) in prefix.iter().enumerate() {
-                            msg.insert(pos, *byte);
+                        if !state.ui_buffers.chat_input_buffer.trim().is_empty() {
+                            let prefix = b"You: ";
+                            let mut msg = state.ui_buffers.chat_input_buffer.as_bytes().to_owned();
+                            for (pos, byte) in prefix.iter().enumerate() {
+                                msg.insert(pos, *byte);
+                            }
+                            state.chat_history.send_message_u8(state.chat_button_pressed, &msg);
+                            state.ui_buffers.chat_input_buffer.clear();
                         }
-                        state.chat_history.send_message_u8(state.chat_button_pressed, &msg);
-                        state.ui_buffers.chat_input_buffer.clear();
                     }
                 }
                 //let mouse_pos = ui.imgui().mouse_pos();
