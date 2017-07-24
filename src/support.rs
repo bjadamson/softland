@@ -109,7 +109,7 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                 }
                 Some(VirtualKeyCode::Left) => {
                     imgui.set_key(1, pressed);
-                    
+
                     let x = game_state.diffuse_color_pos[0];
                     let y = game_state.diffuse_color_pos[1];
                     let z = game_state.diffuse_color_pos[2];
@@ -245,7 +245,7 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
                 mouse.cursor_pos = Some(pos);
             } else {
                 let pos = mouse.cursor_pos.unwrap();
-                game_state.player.camera.rotate_to((x, y), pos, mouse.sensitivity);
+                game_state.player.camera.rotate_to_mouse((x, y), pos, mouse.sensitivity);
             }
             mouse.cursor_pos = Some((x, y));
         }
@@ -270,22 +270,17 @@ fn process_event<'a, R>(event: &glutin::WindowEvent,
 }
 
 fn calculate_color(height: f32) -> [f32; 4] {
-    println!("height {}", height);
-    let c = {
-        if height > 0.6 {
-            [0.9, 0.9, 0.9] // white
-        } else if height > 0.3 {
-            [0.7, 0.7, 0.7] // greay
-        } else if height > -0.2 {
-            [0.2, 0.7, 0.2] // green
-        } else if height > -0.5 {
-            [0.7, 0.4, 0.2] // brown
-        } else {
-            [0.2, 0.2, 0.7] // blue
-        }
-    };
-    let m = 1.0;//height.abs();
-    [c[0] * m, c[1] * m, c[2] * m, 1.0]
+    if height > 0.9 {
+        color::WHITE
+    } else if height > 0.7 {
+        color::GRAY
+    } else if height > 0.5 {
+        color::GREEN
+    } else if height > 0.3 {
+        color::BROWN
+    } else {
+        color::BLUE
+    }
 }
 
 fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
@@ -298,8 +293,7 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
             let pos = v.pos;
             let value = perlin.get(pos);
 
-            let (m, n) = (130.0, 80.0);
-            let pos = [pos[0] * m, pos[1] * m, value * n, 1.0];
+            let pos = [pos[0], pos[1], value, 1.0];
             shader::Vertex {
                 pos: pos,
                 color: calculate_color(value),
@@ -360,7 +354,7 @@ fn copy_vertices<'a, R, F, C, B>(factory: &mut F,
 
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
-                                           state: State,
+                                           mut state: State,
                                            file_contents: &str,
                                            mut build_ui: F) {
     let mut imgui = ImGui::init();
@@ -382,9 +376,9 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
     configure_keys(&mut imgui);
 
-    println!("making ...");
-    let (plane_vertices, plane_indices) = make_geometry(90000);
-    println!("done!");
+    // println!("making ...");
+    // let (plane_vertices, plane_indices) = make_geometry(90000);
+    // println!("done!");
 
     let (triangle_pso, cube_pso, generated_pso) = {
         let mut pso_factory = gpu::PsoFactory::new(&mut factory);
@@ -393,6 +387,14 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
         let generated_pso = pso_factory.triangle_list();
         (triangle_pso, cube_pso, generated_pso)
     };
+
+    let mut world = World::new();
+    world.register::<state::Model>();
+    world.register::<State>();
+
+    state.player.camera.move_forward(10.0);
+    state.player.camera.look_at(&[0.0, 0.0, -1.0].into(), &[0.0, 1.0, 0.0].into());
+    world.add_resource(state);
 
     #[derive(Debug, Deserialize, Serialize)]
     struct Rectangles {
@@ -404,26 +406,44 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
         rectangles: Rectangles,
     }
 
-    println!("about to toml file contents");
-    let foo_content: FooTxtFile = toml::from_str(file_contents).unwrap();
-    println!("foo: {:?}", foo_content);
+    // println!("about to toml file contents");
+    // let foo_content: FooTxtFile = toml::from_str(file_contents).unwrap();
+    // println!("foo: {:?}", foo_content);
 
-    let mut world = World::new();
-    world.register::<state::Model>();
-    world.register::<State>();
+    // for &(x, y, z) in foo_content.rectangles.values.iter() {
+    // let mut model = state::Model::new();
+    // model.translation = Vector3::new(x, y, z);
+    // world.create_entity().with(model).build();
+    // }
 
-    world.add_resource(state);
+    let (xr, yr, zr) = (10, 10, 10);
+    let num_divisions = 4;
+    for x in 0..xr {
+        for y in 0..yr {
+            for z in 0..zr {
+                for i in 0..num_divisions {
+                    let (x, y, z, i, num_divisions) =
+                        (x as f32, y as f32, z as f32, i as f32, num_divisions as f32);
+                    let f = |v| v + (num_divisions / i);
+                    let (x, y, z) = (f(x), f(y), f(z));
+                    let mut model = state::Model::new();
+                    model.translation = Vector3::new(x, y, z);
+                    // model.translation += Vector3::new(0.5, 0.5, 0.5);
+                    model.color = calculate_color(y / yr as f32);
+                    // model.scale = Vector3::new(0.40, 0.40, 0.40);
 
-    for &(x, y, z) in foo_content.rectangles.values.iter() {
-        println!("creating triangle w/xyz: {} {} {}", x, y, z);
-        let mut model = state::Model::new();
-        model.translation = Vector3::new(x, y, z);
-        world.create_entity().with(model).build();
+                    // if i as i32 % 3 == 0 {
+                    // model.color = color::YELLOW;
+                    // }
+                    world.create_entity().with(model).build();
+                }
+            }
+        }
     }
 
     let mut dispatcher = DispatcherBuilder::new()
         .add(UpdateMouseStateSystem, "UpdateMouseStateSystem", &[])
-        .add(TestSystem, "TestSystem", &["UpdateMouseStateSystem"])
+        //.add(TestSystem, "TestSystem", &["UpdateMouseStateSystem"])
         .build();
 
     let mut last_frame = Instant::now();
@@ -432,7 +452,6 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut clock = GameClock::new();
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
-    let mut terrain_rot = 0.0;
 
     loop {
         dispatcher.dispatch(&mut world.res);
@@ -453,7 +472,6 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                               &mut main_depth);
             });
         }
-
         let now = Instant::now();
         let delta = now - last_frame;
         let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
@@ -469,19 +487,6 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
         // 2. Submit geometry to GPU.
         {
-            let dimensions = (0.25, 0.25, 0.25);
-            let rect_colors: [[f32; 4]; 8] = [color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW,
-                                              color::RED,
-                                              color::YELLOW];
-
-            let view = state.player.camera.compute_view();
-            // let angle = cgmath::Deg(sim_time.frame_number() as f32);
-
             // non-ui 2d stuffz
             let projection = {
                 let (width, height) = state.window_dimensions;
@@ -495,20 +500,19 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             for model in world.read::<state::Model>().join() {
                 let tmatrix = Matrix4::from_translation(model.translation);
                 let rmatrix: Matrix4<f32> = model.rotation.into();
-                let smatrix =
-                    Matrix4::from_nonuniform_scale(model.scale.x, model.scale.y, model.scale.z);
+                let smatrix = {
+                    let (x, y, z) = model.scale.into();
+                    Matrix4::from_nonuniform_scale(x, y, z)
+                };
 
                 let mmatrix = tmatrix * rmatrix * smatrix;
+                let view = state.player.camera.compute_view();
                 let uv_matrix = projection * view * mmatrix;
 
-                let colors = [color::WHITE,
-                              color::PINK,
-                              color::WHITE,
-                              color::PINK,
-                              color::WHITE,
-                              color::PINK];
-                let viewpos = model.translation;
-                let (vertices, indices) = shape::construct_cube(&dimensions, &colors);
+                let c = model.color;
+                let colors = [c, c, c, c, c, c];
+                let viewpos = model.translation.into();
+                let (vertices, indices) = shape::construct_cube(&colors);
                 copy_vertices(&mut factory,
                               &mut encoder,
                               state.ambient_color,
@@ -518,16 +522,17 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                               &main_depth,
                               &cube_pso,
                               uv_matrix,
-                              viewpos.into(),
+                              viewpos,
                               &vertices,
                               indices);
             }
-
+            /*
             let tmatrix = Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.0));
-
             let rmatrix: Matrix4<f32> = Quaternion::from_angle_x(cgmath::Deg(0.0)).into();
-
-            let smatrix = Matrix4::from_translation(Vector3::new(10.0, 10.0, 10.0));
+            let smatrix = {
+                let sf = 1.0;
+                Matrix4::from_translation(Vector3::new(sf, sf, sf))
+            };
             let mmatrix = tmatrix * rmatrix * smatrix;
 
             let uv_matrix = projection * view * mmatrix;
@@ -544,6 +549,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                           viewpos.into(),
                           &plane_vertices,
                           plane_indices.as_slice());
+            */
         }
 
         // 3. Construct our UI.

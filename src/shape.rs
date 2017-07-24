@@ -2,10 +2,8 @@ use shader;
 use shader::{SHADER_V, SHADER_F, Vertex, Locals, pipe};
 
 #[inline(always)]
-pub fn construct_cube<'a>(dimensions: &'a (f32, f32, f32),
-                          colors: &[[f32; 4]; 6])
-                          -> ([Vertex; 36], &'a [u16]) {
-    let vertices = make_cube_vertices(dimensions);
+pub fn construct_cube<'a>(colors: &[[f32; 4]; 6]) -> ([Vertex; 36], &'a [u16]) {
+    let vertices = make_cube_vertices();
     let normals = make_cube_normals();
     macro_rules! make_vertex {
         ($idx:expr, $color:expr, $normal:expr) => (
@@ -73,8 +71,8 @@ pub fn make_triangle2d(length: f32, colors: &[[f32; 4]; 3]) -> [Vertex; 3] {
 // }
 //
 
-fn make_cube_vertices(dimensions: &(f32, f32, f32)) -> [[f32; 4]; 36] {
-    let &(w, h, l) = dimensions;
+fn make_cube_vertices() -> [[f32; 4]; 36] {
+    let (w, h, l) = (1.0, 1.0, 1.0);
 
     // bottom face
     [[w, -h, -l, 1.0],

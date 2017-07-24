@@ -96,26 +96,34 @@ impl Camera {
     }
 
     pub fn move_up(&mut self, s: f32) {
-        self.move_y(-s);
-    }
-
-    pub fn move_down(&mut self, s: f32) {
         self.move_y(s);
     }
 
+    pub fn move_down(&mut self, s: f32) {
+        self.move_y(-s);
+    }
+
     pub fn pan_x(&mut self, s: f32) {
-        self.move_dir(s, &Vector3::new(1.0, 0.0, 0.0));
+        self.move_dir(s, &Vec3::new(1.0, 0.0, 0.0));
     }
 
     pub fn pan_y(&mut self, s: f32) {
-        self.move_dir(s, &Vector3::new(0.0, 1.0, 0.0));
+        self.move_dir(s, &Vec3::new(0.0, 1.0, 0.0));
     }
 
-    pub fn rotate_to(&mut self,
-                     (xnew, ynew): (f32, f32),
-                     cursor_pos: (f32, f32),
-                     sensitivity: MouseSensitivity)
-                     -> &mut Self {
+    pub fn look_at(&mut self, dir: &Vector3<f32>, up: &Vector3<f32>) {
+        self.yaw = 0.0;
+        self.pitch = 0.0;
+        self.roll = 0.0;
+
+        self.orientation = cgmath::Rotation::look_at(*dir, *up);
+    }
+
+    pub fn rotate_to_mouse(&mut self,
+                           (xnew, ynew): (f32, f32),
+                           cursor_pos: (f32, f32),
+                           sensitivity: MouseSensitivity)
+                           -> &mut Self {
         let delta: Vector2<f32> = {
             let (xnew, ynew) = (xnew, ynew);
             let (x, y) = cursor_pos;

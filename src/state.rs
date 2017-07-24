@@ -1,3 +1,4 @@
+use color;
 use camera::Camera;
 use chat_history::*;
 
@@ -44,6 +45,8 @@ pub struct Model {
     pub rotation: Quaternion<f32>,
     pub scale: Vector3<f32>,
 
+    pub color: [f32; 4],
+
     // TODO: hack
     pub count: f32,
 }
@@ -59,6 +62,7 @@ impl Model {
             rotation: Quaternion::zero(),
             scale: Vector3::new(1.0, 1.0, 1.0),
 
+            color: color::RED,
             count: 0.0,
         }
     }

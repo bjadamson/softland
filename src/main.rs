@@ -130,7 +130,7 @@ fn main() {
         menu_color_buffer: Default::default(),
         menu_color_buffer_backup: Default::default(),
     };
-    let mut state = {
+    let state = {
         let s = 0.22;
         let c = color::WHITE;
         let ambient_color = [c[0] * s, c[1] * s, c[2] * s, c[3]];
@@ -150,7 +150,7 @@ fn main() {
             quit: false,
 
             player: Player {
-                camera: Camera::from_rot([-90.0, 0.0, 60.0]),
+                camera: Camera::from_rot([0.0, 0.0, 0.0]),
                 move_speed: 0.2,
             },
 
@@ -162,7 +162,6 @@ fn main() {
         }
     };
 
-    state.player.camera.move_backward(65.0);
     let contents = {
         let mut file = File::open("data/foo.txt").unwrap();
         let mut contents = String::new();
