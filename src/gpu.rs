@@ -4,7 +4,7 @@ use gfx;
 use gfx::traits::FactoryExt;
 
 use shader;
-use shader::{SHADER_V, SHADER_F, Vertex, Locals, pipe};
+use shader::*;
 use std::marker::PhantomData;
 
 pub struct PsoFactory<'a, R, F>
@@ -14,6 +14,28 @@ pub struct PsoFactory<'a, R, F>
     factory: &'a mut F,
     phantom: PhantomData<R>,
 }
+
+macro_rules! triangle_strip {
+        ($vshader:ident, $fshader:ident, $factory:ident, $pipe:ident) => ({
+            let set = $factory.create_shader_set($vshader, $fshader).unwrap();
+            let primitive = gfx::Primitive::TriangleStrip;
+            let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+            $factory
+                .create_pipeline_state(&set, primitive, rasterizer, $pipe)
+                .unwrap()
+        })
+    }
+
+macro_rules! triangle_list {
+        ($vshader:ident, $fshader:ident, $factory:ident, $pipe:ident) => ({
+            let set = $factory.create_shader_set($vshader, $fshader).unwrap();
+            let primitive = gfx::Primitive::TriangleList;
+            let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
+            $factory
+                .create_pipeline_state(&set, primitive, rasterizer, $pipe)
+                .unwrap()
+            })
+    }
 
 impl<'a, R, F> PsoFactory<'a, R, F>
     where R: gfx::Resources,
@@ -26,23 +48,27 @@ impl<'a, R, F> PsoFactory<'a, R, F>
         }
     }
 
-    pub fn triangle_strip(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
-        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
-        let primitive = gfx::Primitive::TriangleStrip;
-        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
-        let pipe = pipe::new();
-        self.factory
-            .create_pipeline_state(&set, primitive, rasterizer, pipe)
-            .unwrap()
+    pub fn triangle_strip_colors(&mut self) -> gfx::PipelineState<R, ColorPipe::Meta> {
+        let pipe = ColorPipe::new();
+        let factory = &mut self.factory;
+        triangle_strip!(COLOR_CUBE_SHADER_V, COLOR_CUBE_SHADER_F, factory, pipe)
     }
 
-    pub fn triangle_list(&mut self) -> gfx::PipelineState<R, pipe::Meta> {
-        let set = self.factory.create_shader_set(SHADER_V, SHADER_F).unwrap();
-        let primitive = gfx::Primitive::TriangleList;
-        let rasterizer = gfx::state::Rasterizer::new_fill().with_cull_back();
-        let pipe = pipe::new();
-        self.factory
-            .create_pipeline_state(&set, primitive, rasterizer, pipe)
-            .unwrap()
+    pub fn triangle_list_colors(&mut self) -> gfx::PipelineState<R, ColorPipe::Meta> {
+        let pipe = ColorPipe::new();
+        let factory = &mut self.factory;
+        triangle_list!(COLOR_CUBE_SHADER_V, COLOR_CUBE_SHADER_F, factory, pipe)
+    }
+
+    pub fn triangle_strip_uv(&mut self) -> gfx::PipelineState<R, UvPipe::Meta> {
+        let pipe = UvPipe::new();
+        let factory = &mut self.factory;
+        triangle_strip!(UV_CUBE_SHADER_V, UV_CUBE_SHADER_F, factory, pipe)
+    }
+
+    pub fn triangle_list_uv(&mut self) -> gfx::PipelineState<R, UvPipe::Meta> {
+        let pipe = UvPipe::new();
+        let factory = &mut self.factory;
+        triangle_list!(UV_CUBE_SHADER_V, UV_CUBE_SHADER_F, factory, pipe)
     }
 }

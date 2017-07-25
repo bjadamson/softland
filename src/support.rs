@@ -1,4 +1,4 @@
-extern crate cgmath;
+use cgmath;
 use cgmath::*;
 
 use gfx;
@@ -8,6 +8,7 @@ use gfx::traits::FactoryExt;
 use gfx_window_glutin;
 use glutin;
 use glutin::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode, TouchPhase, WindowEvent};
+use image;
 use imgui::{ImGui, Ui, ImGuiKey};
 use imgui_gfx_renderer::Renderer;
 use std::time::Instant;
@@ -30,6 +31,7 @@ use specs::*;
 use shape;
 use shader;
 use state;
+use std::error::Error;
 use state::*;
 use toml;
 
@@ -40,8 +42,11 @@ impl<'a> System<'a> for TestSystem {
 
     fn run(&mut self, mut model: Self::SystemData) {
         for model in (&mut model).join() {
-            model.count += 1.0;
-            model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.count));
+            model.count += 5.0;
+            let angle = -cgmath::Deg(model.count);
+            let axis = Vector3::new(1.0, 1.0, 1.0).normalize();
+            model.rotation = Quaternion::from_axis_angle(axis, angle);
+            // model.rotation = Quaternion::from_angle_x(cgmath::Deg(model.count));
         }
     }
 }
@@ -283,18 +288,18 @@ fn calculate_color(height: f32) -> [f32; 4] {
     }
 }
 
-fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
+fn make_geometry(n: usize) -> (Vec<shader::ColorVertex>, Vec<u32>) {
     let seed = rand::thread_rng().gen();
     let plane = Plane::subdivide(16, 16);
     let perlin = Perlin::new().set_seed(seed);
-    let vertexes: Vec<shader::Vertex> = plane.shared_vertex_iter()
+    let vertexes: Vec<shader::ColorVertex> = plane.shared_vertex_iter()
         .take(n)
         .map(|v| {
             let pos = v.pos;
             let value = perlin.get(pos);
 
             let pos = [pos[0], pos[1], value, 1.0];
-            shader::Vertex {
+            shader::ColorVertex {
                 pos: pos,
                 color: calculate_color(value),
                 normal: v.normal,
@@ -312,27 +317,86 @@ fn make_geometry(n: usize) -> (Vec<shader::Vertex>, Vec<u32>) {
 }
 
 #[inline(always)]
-fn copy_vertices<'a, R, F, C, B>(factory: &mut F,
-                                 encoder: &mut gfx::Encoder<R, C>,
-                                 ambient: [f32; 4],
-                                 light_color: [f32; 4],
-                                 light_pos: [f32; 3],
-                                 out_color: &'a shader::OutColor<R>,
-                                 depth: &shader::OutDepth<R>,
-                                 pso: &gfx::PipelineState<R, shader::pipe::Meta>,
-                                 model_m: Matrix4<f32>,
-                                 viewpos: [f32; 3],
-                                 vertices: &[shader::Vertex],
-                                 indices: B)
-    where R: gfx::Resources,
+fn copy_uv_vertices<'a, R, F, C, B>(factory: &mut F,
+                                    encoder: &mut gfx::Encoder<R, C>,
+                                    ambient: [f32; 4],
+                                    light_color: [f32; 4],
+                                    light_pos: [f32; 3],
+                                    out_color: &'a shader::OutColor<R>,
+                                    depth: &shader::OutDepth<R>,
+                                    pso: &gfx::PipelineState<R, shader::UvPipe::Meta>,
+                                    sampler: &gfx::handle::Sampler<R>,
+                                    cube_texture_data: &shader::CubeTextureData<R>,
+                                    model_m: Matrix4<f32>,
+                                    viewpos: [f32; 3],
+                                    vertices: &[shader::UvVertex],
+                                    indices: B)
+    where R: gfx::Resources + PartialEq<R>,
+          F: gfx::Factory<R> + 'a,
+          C: gfx::CommandBuffer<R> + 'a,
+          B: gfx::IntoIndexBuffer<R> + 'a
+{
+    // println!("copy begin");
+    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&vertices, indices);
+    let cbuf = factory.create_constant_buffer(1);
+    let front_uvmap = (cube_texture_data.front.clone(), sampler.clone());
+    let back_uvmap = (cube_texture_data.back.clone(), sampler.clone());
+    let top_uvmap = (cube_texture_data.top.clone(), sampler.clone());
+    let bottom_uvmap = (cube_texture_data.bottom.clone(), sampler.clone());
+    let left_uvmap = (cube_texture_data.left.clone(), sampler.clone());
+    let right_uvmap = (cube_texture_data.right.clone(), sampler.clone());
+    let data = shader::UvPipe::Data {
+        vbuf: vertex_buffer,
+        locals: cbuf,
+        uv_front: front_uvmap,
+        uv_back: back_uvmap,
+        uv_top: top_uvmap,
+        uv_bottom: bottom_uvmap,
+        uv_left: left_uvmap,
+        uv_right: right_uvmap,
+        model: model_m.into(),
+        viewpos: viewpos.into(),
+        ambient: ambient,
+        lightcolor: light_color,
+        lightpos: light_pos,
+        out: out_color.clone(),
+        depth: depth.clone(),
+    };
+    let locals = shader::Locals {
+        model: data.model,
+        viewpos: data.viewpos,
+        ambient: data.ambient,
+        lightcolor: data.lightcolor,
+        lightpos: data.lightpos,
+    };
+    encoder.update_buffer(&data.locals, &[locals], 0).unwrap();
+    encoder.draw(&slice, &pso, &data);
+    // println!("copy end");
+}
+
+#[inline(always)]
+fn copy_color_vertices<'a, R, F, C, B>(factory: &mut F,
+                                       encoder: &mut gfx::Encoder<R, C>,
+                                       ambient: [f32; 4],
+                                       light_color: [f32; 4],
+                                       light_pos: [f32; 3],
+                                       out_color: &'a shader::OutColor<R>,
+                                       depth: &shader::OutDepth<R>,
+                                       pso: &gfx::PipelineState<R, shader::ColorPipe::Meta>,
+                                       model_m: Matrix4<f32>,
+                                       viewpos: [f32; 3],
+                                       vertices: &[shader::ColorVertex],
+                                       indices: B)
+    where R: gfx::Resources + PartialEq<R>,
           F: gfx::Factory<R> + 'a,
           C: gfx::CommandBuffer<R> + 'a,
           B: gfx::IntoIndexBuffer<R> + 'a
 {
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&vertices, indices);
-    let data = shader::pipe::Data {
+    let cbuf = factory.create_constant_buffer(1);
+    let data = shader::ColorPipe::Data {
         vbuf: vertex_buffer,
-        locals: factory.create_constant_buffer(1),
+        locals: cbuf,
         model: model_m.into(),
         viewpos: viewpos.into(),
         ambient: ambient,
@@ -352,11 +416,27 @@ fn copy_vertices<'a, R, F, C, B>(factory: &mut F,
     encoder.draw(&slice, &pso, &data);
 }
 
+fn load_texture<R, F>(factory: &mut F,
+                      data: &[u8])
+                      -> Result<gfx::handle::ShaderResourceView<R, [f32; 4]>, Box<Error>>
+    where R: gfx::Resources,
+          F: gfx::Factory<R>
+{
+    use std::io::Cursor;
+    use gfx::texture as t;
+    let img = image::load(Cursor::new(data), image::PNG)?.to_rgba();
+    let (width, height) = img.dimensions();
+    let kind = t::Kind::D2(width as t::Size, height as t::Size, t::AaMode::Single);
+    let (_, view) = factory.create_texture_immutable_u8::<shader::ColorFormat>(kind, &[&img])?;
+    Ok(view)
+}
+
 pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                                            clear_color: [f32; 4],
                                            mut state: State,
                                            file_contents: &str,
-                                           mut build_ui: F) {
+                                           mut build_ui: F)
+                                           -> Result<(), Box<Error>> {
     let mut imgui = ImGui::init();
 
     let (w, h) = state.window_dimensions;
@@ -380,12 +460,16 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     // let (plane_vertices, plane_indices) = make_geometry(90000);
     // println!("done!");
 
-    let (triangle_pso, cube_pso, generated_pso) = {
+    let (cube_colors_pso, cube_uvs_pso) = {
+        // let (/*triangle_pso, */cube_uv_pso, /*generated_pso*/) = {
         let mut pso_factory = gpu::PsoFactory::new(&mut factory);
-        let triangle_pso = pso_factory.triangle_list();
-        let cube_pso = pso_factory.triangle_list();
-        let generated_pso = pso_factory.triangle_list();
-        (triangle_pso, cube_pso, generated_pso)
+        // let triangle_pso = pso_factory.triangle_list_uv();
+        let cube_colors_pso = pso_factory.triangle_list_colors();
+        let cube_uvs_pso = pso_factory.triangle_list_uv();
+        // let generated_pso = pso_factory.triangle_list_uv();
+        // (triangle_pso, cube_pso, generated_pso)
+        (cube_colors_pso, cube_uvs_pso)
+
     };
 
     let mut world = World::new();
@@ -416,7 +500,25 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     // world.create_entity().with(model).build();
     // }
 
-    let (xr, yr, zr) = (10, 10, 10);
+    println!("pre load textures");
+    macro_rules! load {
+        ($filename:tt) => {{
+            println!("loading file: {}", concat!("../assets/", $filename));
+            load_texture(&mut factory, include_bytes!(concat!("../assets/", $filename)))?
+        }}
+    }
+    let front = load!("cube_front.png");
+    let back = load!("cube_back.png");
+    let top = load!("cube_top.png");
+    let bottom = load!("cube_bottom.png");
+    let left = load!("cube_left.png");
+    let right = load!("cube_right.png");
+
+    eprintln!("pre sampler create");
+    let sampler = factory.create_sampler_linear();
+    println!("post load");
+
+    let (xr, yr, zr) = (20, 20, 10);
     let num_divisions = 4;
     for x in 0..xr {
         for y in 0..yr {
@@ -443,7 +545,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
 
     let mut dispatcher = DispatcherBuilder::new()
         .add(UpdateMouseStateSystem, "UpdateMouseStateSystem", &[])
-        //.add(TestSystem, "TestSystem", &["UpdateMouseStateSystem"])
+        .add(TestSystem, "TestSystem", &["UpdateMouseStateSystem"])
         .build();
 
     let mut last_frame = Instant::now();
@@ -452,6 +554,8 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
     let mut clock = GameClock::new();
     let mut counter = FrameCounter::new(60.0, RunningAverageSampler::with_max_samples(120));
     let mut sim_time;
+
+    let mut rng = rand::thread_rng();
 
     loop {
         dispatcher.dispatch(&mut world.res);
@@ -496,12 +600,11 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                 cgmath::perspective(fovy, aspect_ratio as f32, near, far)
             };
 
-            // draw based on data from foo.txt
             for model in world.read::<state::Model>().join() {
                 let tmatrix = Matrix4::from_translation(model.translation);
                 let rmatrix: Matrix4<f32> = model.rotation.into();
                 let smatrix = {
-                    let (x, y, z) = model.scale.into();
+                    let (x, y, z) = (model.scale / 4.0).into();
                     Matrix4::from_nonuniform_scale(x, y, z)
                 };
 
@@ -512,19 +615,45 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
                 let c = model.color;
                 let colors = [c, c, c, c, c, c];
                 let viewpos = model.translation.into();
-                let (vertices, indices) = shape::construct_cube(&colors);
-                copy_vertices(&mut factory,
-                              &mut encoder,
-                              state.ambient_color,
-                              state.diffuse_color,
-                              state.diffuse_color_pos,
-                              &main_color,
-                              &main_depth,
-                              &cube_pso,
-                              uv_matrix,
-                              viewpos,
-                              &vertices,
-                              indices);
+                let (uv_vertices, uv_indices) = shape::construct_uv_cube();
+                let (color_vertices, color_indices) = shape::construct_color_cube(&colors);
+                let cube_texture_data = shader::CubeTextureData {
+                    front: front.clone(),
+                    back: back.clone(),
+                    top:top.clone(),
+                    bottom: bottom.clone(),
+                    left:left.clone(),
+                    right:right.clone()
+                };
+                if rng.gen() {
+                    copy_uv_vertices(&mut factory,
+                                &mut encoder,
+                                state.ambient_color,
+                                state.diffuse_color,
+                                state.diffuse_color_pos,
+                                &main_color,
+                                &main_depth,
+                                &cube_uvs_pso,
+                                &sampler,
+                                &cube_texture_data,
+                                uv_matrix,
+                                viewpos,
+                                &uv_vertices,
+                                uv_indices);
+                } else {
+                    copy_color_vertices(&mut factory,
+                                  &mut encoder,
+                                  state.ambient_color,
+                                  state.diffuse_color,
+                                  state.diffuse_color_pos,
+                                  &main_color,
+                                  &main_depth,
+                                  &cube_colors_pso,
+                                  uv_matrix,
+                                  viewpos,
+                                  &color_vertices,
+                                  color_indices);
+                }
             }
             /*
             let tmatrix = Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.0));
@@ -570,6 +699,7 @@ pub fn run_game<F: FnMut(&Ui, &mut State)>(title: &str,
             break;
         }
     }
+    Ok(())
 }
 
 fn configure_keys(imgui: &mut ImGui) {

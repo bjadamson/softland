@@ -6,6 +6,7 @@ extern crate imgui;
 extern crate itertools;
 
 extern crate game_time;
+extern crate image;
 
 #[macro_use]
 extern crate gfx;
@@ -170,5 +171,8 @@ fn main() {
     };
 
     let clear_color: [f32; 4] = color::BLACK;
-    support::run_game("Softland", clear_color, state, &contents, ui::render_ui);
+    match support::run_game("Softland", clear_color, state, &contents, ui::render_ui) {
+        Ok(_) => {}
+        Err(e) => println!("{}", e),
+    }
 }
